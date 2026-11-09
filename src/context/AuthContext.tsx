@@ -240,9 +240,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const existingProfile = db[cleanEmail].profile;
       if (googleUser.avatar) {
         existingProfile.avatar = googleUser.avatar;
-        db[cleanEmail].profile = existingProfile;
-        localStorage.setItem('prep_ielts_users_db', JSON.stringify(db));
       }
+      if (googleUser.name && (!existingProfile.name || existingProfile.name === cleanEmail.split('@')[0])) {
+        existingProfile.name = googleUser.name;
+      }
+      db[cleanEmail].profile = existingProfile;
+      localStorage.setItem('prep_ielts_users_db', JSON.stringify(db));
+      
+      // Save verified Google record
+      try {
+        const verifiedListRaw = localStorage.getItem('prep_ielts_google_verified_accounts');
+        const list: Array<{ name: string; email: string; avatar: string; lastVerified: string }> = verifiedListRaw ? JSON.parse(verifiedListRaw) : [];
+        const updatedList = [
+          {
+            name: existingProfile.name,
+            email: cleanEmail,
+            avatar: existingProfile.avatar,
+            lastVerified: new Date().toISOString()
+          },
+          ...list.filter(item => item.email.toLowerCase() !== cleanEmail)
+        ];
+        localStorage.setItem('prep_ielts_google_verified_accounts', JSON.stringify(updatedList));
+        localStorage.setItem('prep_ielts_last_verified_google', JSON.stringify(updatedList[0]));
+      } catch (e) {}
+
       saveUser(existingProfile);
       setPreviewAsStudent(false);
       return { success: true, isNewUser: false };
@@ -269,6 +290,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     saveToUsersDb(cleanEmail, 'google_verified_oauth_' + Date.now(), newProfile);
+
+    // Save verified Google record
+    try {
+      const verifiedListRaw = localStorage.getItem('prep_ielts_google_verified_accounts');
+      const list: Array<{ name: string; email: string; avatar: string; lastVerified: string }> = verifiedListRaw ? JSON.parse(verifiedListRaw) : [];
+      const updatedList = [
+        {
+          name: newProfile.name,
+          email: cleanEmail,
+          avatar: newProfile.avatar,
+          lastVerified: new Date().toISOString()
+        },
+        ...list.filter(item => item.email.toLowerCase() !== cleanEmail)
+      ];
+      localStorage.setItem('prep_ielts_google_verified_accounts', JSON.stringify(updatedList));
+      localStorage.setItem('prep_ielts_last_verified_google', JSON.stringify(updatedList[0]));
+    } catch (e) {}
+
     saveUser(newProfile);
     setPreviewAsStudent(false);
     return { success: true, isNewUser: true };
@@ -410,12 +449,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const switchRole = (role: UserRole) => {
     if (!user) return;
-    saveUser({ ...user, role });
+    const updated = { ...user, role };
+    saveUser(updated);
+    try {
+      const db = getUsersDb();
+      if (user.email && db[user.email.toLowerCase()]) {
+        db[user.email.toLowerCase()].profile = updated;
+        localStorage.setItem('prep_ielts_users_db', JSON.stringify(db));
+      }
+    } catch (e) {}
   };
 
   const upgradePlan = (plan: 'Free' | 'Pro' | 'VIP') => {
     if (!user) return;
-    saveUser({ ...user, plan });
+    const updated: UserProfile = { ...user, plan, paymentStatus: 'approved' };
+    saveUser(updated);
+    try {
+      const db = getUsersDb();
+      if (user.email && db[user.email.toLowerCase()]) {
+        db[user.email.toLowerCase()].profile = updated;
+        localStorage.setItem('prep_ielts_users_db', JSON.stringify(db));
+      }
+    } catch (e) {}
   };
 
   return (

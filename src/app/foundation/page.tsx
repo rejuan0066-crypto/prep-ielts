@@ -170,7 +170,7 @@ export default function PreIeltsFoundationPage() {
   // Load completed lessons & Last Read Lesson from User Account Database on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('pre_ielts_completed_lessons');
+      const saved = localStorage.getItem(`pre_ielts_completed_lessons_${userKey}`) || localStorage.getItem('pre_ielts_completed_lessons');
       if (saved) {
         setCompletedLessons(JSON.parse(saved));
       }
@@ -222,7 +222,7 @@ export default function PreIeltsFoundationPage() {
       if (prev.includes(lessonId)) return prev;
       const updated = [...prev, lessonId];
       try {
-        localStorage.setItem('pre_ielts_completed_lessons', JSON.stringify(updated));
+        localStorage.setItem(`pre_ielts_completed_lessons_${userKey}`, JSON.stringify(updated));
       } catch (e) {
         console.error('Failed to save completed lessons', e);
       }
@@ -234,7 +234,7 @@ export default function PreIeltsFoundationPage() {
     if (confirm('আপনি কি সত্যিই সম্পূর্ণ অগ্রগতি রিসেট করে আবার লেসন ১ থেকে শুরু করতে চান?')) {
       setCompletedLessons([]);
       try {
-        localStorage.removeItem('pre_ielts_completed_lessons');
+        localStorage.removeItem(`pre_ielts_completed_lessons_${userKey}`);
       } catch (e) {
         console.error(e);
       }
