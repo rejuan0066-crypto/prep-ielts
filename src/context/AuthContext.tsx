@@ -46,8 +46,8 @@ interface AuthContextType {
   authLoaded: boolean;
   previewAsStudent: boolean;
   toggleStudentPreview: () => void;
-  loginWithGoogle: () => void;
   loginWithCredentials: (email: string, password: string) => { success: boolean; message?: string };
+  registerUser: (name: string, email: string, password: string) => { success: boolean; message?: string };
   logout: () => void;
   updateUser: (data: Partial<UserProfile>) => void;
   saveDiagnostic: (result: DiagnosticResult) => void;
@@ -116,36 +116,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPreviewAsStudent(prev => !prev);
   };
 
-  const loginWithGoogle = () => {
-    let savedDiag: DiagnosticResult | undefined;
+  const getUsersDb = (): Record<string, { password?: string; profile: UserProfile }> => {
     try {
-      const stored = localStorage.getItem('prep_ielts_diagnostic_google');
-      if (stored) savedDiag = JSON.parse(stored);
-    } catch (e) {}
+      const stored = localStorage.getItem('prep_ielts_users_db');
+      return stored ? JSON.parse(stored) : {};
+    } catch (e) {
+      return {};
+    }
+  };
 
-    const googleUser: UserProfile = {
-      id: 'usr_' + Date.now().toString().slice(-4),
-      name: 'রেজওয়ান আহমেদ (Google)',
-      email: 'user.google@gmail.com',
+  const saveToUsersDb = (email: string, password: string, profile: UserProfile) => {
+    try {
+      const db = getUsersDb();
+      db[email.trim().toLowerCase()] = { password, profile };
+      localStorage.setItem('prep_ielts_users_db', JSON.stringify(db));
+    } catch (e) {}
+  };
+
+  const registerUser = (name: string, email: string, password: string): { success: boolean; message?: string } => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+    if (!cleanName || cleanName.length < 2) {
+      return { success: false, message: 'আপনার সঠিক পূর্ণ নাম লিখুন।' };
+    }
+    if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      return { success: false, message: 'সঠিক ইমেইল অ্যাড্রেস প্রদান করুন।' };
+    }
+    if (!password || password.length < 6) {
+      return { success: false, message: 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।' };
+    }
+
+    const db = getUsersDb();
+    if (db[cleanEmail]) {
+      return { success: false, message: 'এই ইমেইল দিয়ে ইতিপূর্বেই একটি অ্যাকাউন্ট তৈরি করা হয়েছে। অনুগ্রহ করে লগইন করুন।' };
+    }
+
+    const newProfile: UserProfile = {
+      id: 'usr_' + Date.now().toString().slice(-6),
+      name: cleanName,
+      email: cleanEmail,
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
       role: 'student',
-      plan: 'Pro',
-      targetBand: savedDiag ? savedDiag.targetBand : 7.5,
-      currentBand: savedDiag ? savedDiag.assessedBand : 0,
+      plan: 'Free',
+      targetBand: 7.5,
+      currentBand: 0,
       studyReminderTime: '21:00',
       emailReminderEnabled: true,
-      streakDays: savedDiag ? 1 : 0,
-      testsCompleted: savedDiag ? 1 : 0,
-      joinedDate: 'আজকে',
-      diagnostic: savedDiag
+      streakDays: 0,
+      testsCompleted: 0,
+      joinedDate: new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' }),
+      diagnostic: undefined
     };
-    saveUser(googleUser);
+
+    saveToUsersDb(cleanEmail, password, newProfile);
+    saveUser(newProfile);
     setPreviewAsStudent(false);
+    return { success: true };
   };
 
   const loginWithCredentials = (email: string, password: string): { success: boolean; message?: string } => {
+    const cleanEmail = email.trim().toLowerCase();
+
     // 1. Super Admin
-    if (email.trim().toLowerCase() === ADMIN_CREDENTIALS.email.toLowerCase()) {
+    if (cleanEmail === ADMIN_CREDENTIALS.email.toLowerCase()) {
       if (password === ADMIN_CREDENTIALS.password) {
         const adminUser: UserProfile = {
           id: 'admin_root',
@@ -171,11 +204,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // 2. Moderator Login
-    if (email.trim().toLowerCase() === MODERATOR_CREDENTIALS.email.toLowerCase()) {
+    if (cleanEmail === MODERATOR_CREDENTIALS.email.toLowerCase()) {
       if (password === MODERATOR_CREDENTIALS.password) {
         const modUser: UserProfile = {
           id: 'mod_farhana',
-          name: 'ড. ফারহানা (IELTS মডারেটর)',
+          name: 'ড. ফারহানা (মডারেটর)',
           email: MODERATOR_CREDENTIALS.email,
           avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
           role: 'moderator',
@@ -196,70 +229,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // 3. Student Demo
-    if (email.trim().toLowerCase() === STUDENT_CREDENTIALS.email.toLowerCase()) {
-      if (password === STUDENT_CREDENTIALS.password) {
-        let savedDiag: DiagnosticResult | undefined;
-        try {
-          const stored = localStorage.getItem('prep_ielts_diagnostic_usr_demo');
-          if (stored) savedDiag = JSON.parse(stored);
-        } catch (e) {}
-
-        const studentUser: UserProfile = {
-          id: 'usr_demo',
-          name: 'রেজওয়ান শিক্ষার্থী',
-          email: STUDENT_CREDENTIALS.email,
-          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-          role: 'student',
-          plan: 'Pro',
-          targetBand: savedDiag ? savedDiag.targetBand : 7.5,
-          currentBand: savedDiag ? savedDiag.assessedBand : 0,
-          studyReminderTime: '20:30',
-          emailReminderEnabled: true,
-          streakDays: savedDiag ? 1 : 0,
-          testsCompleted: savedDiag ? 1 : 0,
-          joinedDate: 'আজকে',
-          diagnostic: savedDiag
-        };
-        saveUser(studentUser);
+    // 3. User Database lookup (Real isolated user accounts)
+    const db = getUsersDb();
+    const existing = db[cleanEmail];
+    if (existing) {
+      if (existing.password === password) {
+        saveUser(existing.profile);
         setPreviewAsStudent(false);
         return { success: true };
       } else {
-        return { success: false, message: 'ভুল পাসওয়ার্ড! অনুগ্রহ করে সঠিক পাসওয়ার্ড দিন।' };
+        return { success: false, message: 'পাসওয়ার্ড ভুল হয়েছে! অনুগ্রহ করে সঠিক পাসওয়ার্ড দিন।' };
       }
     }
 
-    // 4. Fallback student signup
-    if (email.includes('@') && password.length >= 6) {
-      const studentId = 'usr_' + Date.now().toString().slice(-4);
-      let savedDiag: DiagnosticResult | undefined;
-      try {
-        const stored = localStorage.getItem('prep_ielts_diagnostic_' + email.trim().toLowerCase());
-        if (stored) savedDiag = JSON.parse(stored);
-      } catch (e) {}
-
-      const newUser: UserProfile = {
-        id: studentId,
-        name: email.split('@')[0],
-        email: email,
+    // 4. Direct registration if user is logging in with valid email & password
+    if (cleanEmail.includes('@') && password.length >= 6) {
+      const studentName = cleanEmail.split('@')[0];
+      const newProfile: UserProfile = {
+        id: 'usr_' + Date.now().toString().slice(-6),
+        name: studentName,
+        email: cleanEmail,
         avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
         role: 'student',
         plan: 'Free',
-        targetBand: savedDiag ? savedDiag.targetBand : 7.0,
-        currentBand: savedDiag ? savedDiag.assessedBand : 0,
+        targetBand: 7.5,
+        currentBand: 0,
         studyReminderTime: '21:00',
         emailReminderEnabled: true,
-        streakDays: savedDiag ? 1 : 0,
-        testsCompleted: savedDiag ? 1 : 0,
-        joinedDate: 'আজকে',
-        diagnostic: savedDiag
+        streakDays: 0,
+        testsCompleted: 0,
+        joinedDate: new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' }),
+        diagnostic: undefined
       };
-      saveUser(newUser);
+      saveToUsersDb(cleanEmail, password, newProfile);
+      saveUser(newProfile);
       setPreviewAsStudent(false);
       return { success: true };
     }
 
-    return { success: false, message: 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।' };
+    return { success: false, message: 'সঠিক ইমেইল ও পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর) দিন।' };
   };
 
   const logout = () => {
@@ -271,6 +279,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return;
     const updated = { ...user, ...data };
     saveUser(updated);
+    try {
+      const db = getUsersDb();
+      if (user.email && db[user.email.toLowerCase()]) {
+        db[user.email.toLowerCase()].profile = updated;
+        localStorage.setItem('prep_ielts_users_db', JSON.stringify(db));
+      }
+    } catch (e) {}
   };
 
   const saveDiagnostic = (result: DiagnosticResult) => {
@@ -282,11 +297,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       testsCompleted: (user.testsCompleted || 0) + 1,
       diagnostic: result
     };
-    try {
-      if (user.id) localStorage.setItem('prep_ielts_diagnostic_' + user.id, JSON.stringify(result));
-      if (user.email) localStorage.setItem('prep_ielts_diagnostic_' + user.email.toLowerCase(), JSON.stringify(result));
-    } catch (e) {}
     saveUser(updated);
+
+    try {
+      const db = getUsersDb();
+      if (user.email && db[user.email.toLowerCase()]) {
+        db[user.email.toLowerCase()].profile = updated;
+        localStorage.setItem('prep_ielts_users_db', JSON.stringify(db));
+      }
+    } catch (e) {}
   };
 
   const switchRole = (role: UserRole) => {
@@ -305,8 +324,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       authLoaded,
       previewAsStudent,
       toggleStudentPreview,
-      loginWithGoogle, 
       loginWithCredentials, 
+      registerUser,
       logout, 
       updateUser, 
       saveDiagnostic,
