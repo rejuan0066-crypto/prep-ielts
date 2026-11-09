@@ -35,6 +35,7 @@ export interface PendingPaymentInfo {
 
 export interface UserProfile {
   id: string;
+  googleId?: string;
   name: string;
   email: string;
   avatar: string;
@@ -155,11 +156,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const syncProfileToServer = (email: string, profile: UserProfile) => {
+    try {
+      if (typeof window !== 'undefined') {
+        fetch('/api/user/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, profile })
+        }).catch(() => {});
+      }
+    } catch (e) {}
+  };
+
   const saveToUsersDb = (email: string, password: string, profile: UserProfile) => {
     try {
       const db = getUsersDb();
       db[email.trim().toLowerCase()] = { password, profile };
       localStorage.setItem('prep_ielts_users_db', JSON.stringify(db));
+      syncProfileToServer(email, profile);
     } catch (e) {}
   };
 
@@ -244,25 +258,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (googleUser.name && (!existingProfile.name || existingProfile.name === cleanEmail.split('@')[0])) {
         existingProfile.name = googleUser.name;
       }
+      if (googleUser.googleId) {
+        existingProfile.googleId = googleUser.googleId;
+      }
       db[cleanEmail].profile = existingProfile;
       localStorage.setItem('prep_ielts_users_db', JSON.stringify(db));
-      
-      // Save verified Google record
-      try {
-        const verifiedListRaw = localStorage.getItem('prep_ielts_google_verified_accounts');
-        const list: Array<{ name: string; email: string; avatar: string; lastVerified: string }> = verifiedListRaw ? JSON.parse(verifiedListRaw) : [];
-        const updatedList = [
-          {
-            name: existingProfile.name,
-            email: cleanEmail,
-            avatar: existingProfile.avatar,
-            lastVerified: new Date().toISOString()
-          },
-          ...list.filter(item => item.email.toLowerCase() !== cleanEmail)
-        ];
-        localStorage.setItem('prep_ielts_google_verified_accounts', JSON.stringify(updatedList));
-        localStorage.setItem('prep_ielts_last_verified_google', JSON.stringify(updatedList[0]));
-      } catch (e) {}
+      syncProfileToServer(cleanEmail, existingProfile);
 
       saveUser(existingProfile);
       setPreviewAsStudent(false);
@@ -273,6 +274,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // STRICTLY real isolated account - absolutely NO fake scores or demo data
     const newProfile: UserProfile = {
       id: 'usr_g_' + Date.now().toString().slice(-6),
+      googleId: googleUser.googleId,
       name: cleanName,
       email: cleanEmail,
       avatar: googleUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=E11D48&color=fff`,
@@ -289,25 +291,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       paymentStatus: 'unpaid'
     };
 
-    saveToUsersDb(cleanEmail, 'google_verified_oauth_' + Date.now(), newProfile);
-
-    // Save verified Google record
-    try {
-      const verifiedListRaw = localStorage.getItem('prep_ielts_google_verified_accounts');
-      const list: Array<{ name: string; email: string; avatar: string; lastVerified: string }> = verifiedListRaw ? JSON.parse(verifiedListRaw) : [];
-      const updatedList = [
-        {
-          name: newProfile.name,
-          email: cleanEmail,
-          avatar: newProfile.avatar,
-          lastVerified: new Date().toISOString()
-        },
-        ...list.filter(item => item.email.toLowerCase() !== cleanEmail)
-      ];
-      localStorage.setItem('prep_ielts_google_verified_accounts', JSON.stringify(updatedList));
-      localStorage.setItem('prep_ielts_last_verified_google', JSON.stringify(updatedList[0]));
-    } catch (e) {}
-
+    saveToUsersDb(cleanEmail, 'google_verified_oauth_' + (googleUser.googleId || Date.now()), newProfile);
     saveUser(newProfile);
     setPreviewAsStudent(false);
     return { success: true, isNewUser: true };
@@ -424,6 +408,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         db[user.email.toLowerCase()].profile = updated;
         localStorage.setItem('prep_ielts_users_db', JSON.stringify(db));
       }
+      syncProfileToServer(user.email, updated);
     } catch (e) {}
   };
 
@@ -444,6 +429,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         db[user.email.toLowerCase()].profile = updated;
         localStorage.setItem('prep_ielts_users_db', JSON.stringify(db));
       }
+      syncProfileToServer(user.email, updated);
     } catch (e) {}
   };
 
@@ -457,6 +443,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         db[user.email.toLowerCase()].profile = updated;
         localStorage.setItem('prep_ielts_users_db', JSON.stringify(db));
       }
+      syncProfileToServer(user.email, updated);
     } catch (e) {}
   };
 
@@ -470,6 +457,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         db[user.email.toLowerCase()].profile = updated;
         localStorage.setItem('prep_ielts_users_db', JSON.stringify(db));
       }
+      syncProfileToServer(user.email, updated);
     } catch (e) {}
   };
 
