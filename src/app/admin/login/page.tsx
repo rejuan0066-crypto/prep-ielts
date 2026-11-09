@@ -65,27 +65,6 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        {/* Demo Credentials Box */}
-        <div className="p-4 bg-purple-950/40 border border-purple-800/60 rounded-2xl space-y-2 text-xs">
-          <div className="flex items-center justify-between text-purple-300 font-bold">
-            <span className="flex items-center gap-1.5">
-              <KeyRound className="w-3.5 h-3.5" />
-              অফিশিয়াল অ্যাডমিন তথ্য:
-            </span>
-            <button
-              type="button"
-              onClick={fillAdminCredentials}
-              className="text-[11px] bg-purple-600 hover:bg-purple-500 text-white px-2.5 py-1 rounded-lg font-bold transition-all"
-            >
-              ⚡ অটো ফিল করুন
-            </button>
-          </div>
-          <div className="font-mono text-slate-300 text-[11px] space-y-0.5">
-            <div>ইমেইল: <strong className="text-white">{ADMIN_CREDENTIALS.email}</strong></div>
-            <div>পাসওয়ার্ড: <strong className="text-white">{ADMIN_CREDENTIALS.password}</strong></div>
-          </div>
-        </div>
-
         {/* Error Alert */}
         {errorMessage && (
           <div className="p-3 bg-rose-500/20 border border-rose-500/40 rounded-xl text-xs text-rose-300 flex items-center gap-2">

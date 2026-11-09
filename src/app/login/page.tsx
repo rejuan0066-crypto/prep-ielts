@@ -88,32 +88,6 @@ export default function LoginPage() {
     }, 600);
   };
 
-  const handleAutofill = (type: 'student' | 'admin') => {
-    if (type === 'admin') {
-      setEmail(ADMIN_CREDENTIALS.email);
-      setPassword(ADMIN_CREDENTIALS.password);
-      setActiveTab('admin');
-    } else {
-      setEmail(STUDENT_CREDENTIALS.email);
-      setPassword(STUDENT_CREDENTIALS.password);
-      setActiveTab('student');
-    }
-    setErrorMsg(null);
-  };
-
-  const handleContinueAsGuest = () => {
-    loginWithCredentials(STUDENT_CREDENTIALS.email, STUDENT_CREDENTIALS.password);
-    try {
-      const saved = localStorage.getItem('prep_ielts_user');
-      const parsed = saved ? JSON.parse(saved) : null;
-      if (!parsed?.diagnostic?.completed) {
-        router.push('/diagnostic');
-        return;
-      }
-    } catch (e) {}
-    router.push('/dashboard');
-  };
-
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white relative overflow-hidden">
       
@@ -246,40 +220,9 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* 1-Click Demo Login Shortcuts */}
-        <div className="pt-2 border-t border-white/10 space-y-2">
-          <div className="text-[11px] text-slate-400 font-bold text-center">
-            টেস্টিংয়ের জন্য দ্রুত ১-ক্লিক অটোফিল:
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => handleAutofill('student')}
-              className="px-2.5 py-2 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-[11px] font-bold text-slate-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-            >
-              <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>শিক্ষার্থী অটোফিল</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleAutofill('admin')}
-              className="px-2.5 py-2 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-[11px] font-bold text-slate-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-            >
-              <KeyRound className="w-3.5 h-3.5 text-purple-400" />
-              <span>অ্যাডমিন অটোফিল</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Continue as Guest */}
-        <div className="text-center pt-1">
-          <button
-            type="button"
-            onClick={handleContinueAsGuest}
-            className="text-xs text-slate-400 hover:text-white underline font-semibold transition-colors cursor-pointer"
-          >
-            সরাসরি ডেমো শিক্ষার্থী হিসেবে প্রবেশ করুন ➔
-          </button>
+        {/* Sign up note */}
+        <div className="text-center pt-2 border-t border-white/10 text-xs text-slate-400">
+          <span>অ্যাকাউন্ট নেই? আপনার ইমেইল ও পাসওয়ার্ড দিলেই স্বয়ংক্রিয়ভাবে অ্যাকাউন্ট তৈরি হয়ে যাবে।</span>
         </div>
 
       </div>

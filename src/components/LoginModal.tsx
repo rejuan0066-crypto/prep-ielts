@@ -132,27 +132,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           <div className="flex-grow border-t border-slate-200"></div>
         </div>
 
-        {/* Demo Autofill Quick Buttons */}
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-400 text-[11px]">ডেমো তথ্য:</span>
-          <button
-            type="button"
-            onClick={() => autoFillCredentials('admin')}
-            className="px-2.5 py-1 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-lg font-bold text-[10px] flex items-center gap-1 transition-colors"
-          >
-            <ShieldCheck className="w-3 h-3" />
-            <span>অ্যাডমিন অটো-ফিল</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => autoFillCredentials('student')}
-            className="px-2.5 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 rounded-lg font-bold text-[10px] flex items-center gap-1 transition-colors"
-          >
-            <GraduationCap className="w-3 h-3" />
-            <span>শিক্ষার্থী অটো-ফিল</span>
-          </button>
-        </div>
-
         {/* Error Alert */}
         {errorMsg && (
           <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700">
