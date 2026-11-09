@@ -52,7 +52,7 @@ export default function PricingPage() {
     durationLabel: string;
   } | null>(null);
 
-  const [checkoutTab, setCheckoutTab] = useState<'online' | 'manual'>('online');
+  const [checkoutTab, setCheckoutTab] = useState<'manual' | 'online'>('manual');
   const [onlineGateway, setOnlineGateway] = useState<'bkash' | 'nagad' | 'card'>('bkash');
   const [manualMethod, setManualMethod] = useState<'bKash' | 'Nagad' | 'Bank'>('bKash');
 
@@ -157,46 +157,9 @@ export default function PricingPage() {
     setSenderNumber('');
   };
 
-  // 1. ONLINE INSTANT AUTO-VERIFY PAYMENT
+  // 1. ONLINE PAYMENT: Strictly directs to verified manual payment to prevent fake auto-verification bypass
   const handleOnlineAutoPayment = () => {
-    if (!selectedPlan || !user) return;
-    setIsProcessing(true);
-
-    const priceCalc = calculateFinalPrice(selectedPlan.basePrice);
-
-    setTimeout(() => {
-      const generatedTrxId = 'AUTO_' + onlineGateway.toUpperCase() + '_' + Math.random().toString(36).substring(2, 9).toUpperCase();
-
-      const newTx: PaymentTransaction = {
-        id: 'trx_' + Date.now(),
-        studentName: user.name,
-        studentEmail: user.email,
-        planName: selectedPlan.name,
-        duration: selectedPlan.durationLabel,
-        originalAmount: priceCalc.originalPrice,
-        discountAmount: priceCalc.totalDiscount,
-        finalAmount: priceCalc.finalPrice,
-        method: onlineGateway === 'bkash' ? 'bKash (Online)' : onlineGateway === 'nagad' ? 'Nagad (Online)' : 'Card',
-        trxId: generatedTrxId,
-        couponUsed: appliedCoupon?.coupon?.code,
-        date: new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' }) + ', ' + new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }),
-        status: 'approved',
-        verifiedBy: 'System Auto-Gateway'
-      };
-
-      const existingTxs = getTransactions();
-      saveTransactions([newTx, ...existingTxs]);
-
-      // Update student profile directly to approved
-      updateUser({
-        plan: selectedPlan.key,
-        paymentStatus: 'approved',
-        pendingPayment: undefined
-      });
-
-      setIsProcessing(false);
-      setSuccessType('online');
-    }, 1200);
+    setCheckoutTab('manual');
   };
 
   // 2. MANUAL SEND MONEY & TrxID SUBMISSION
@@ -635,99 +598,53 @@ export default function PricingPage() {
                   );
                 })()}
 
-                {/* Checkout Method Tabs: Online Instant vs Manual TrxID */}
+                {/* Checkout Method Tabs: Manual TrxID vs Online Gateway */}
                 <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs font-bold">
                   <button
                     type="button"
-                    onClick={() => setCheckoutTab('online')}
-                    className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      checkoutTab === 'online' ? 'bg-[#E11D48] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <Zap className="w-3.5 h-3.5" />
-                    <span>অনলাইন অটো ভেরিফাই</span>
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setCheckoutTab('manual')}
-                    className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                      checkoutTab === 'manual' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    className={`flex-1 py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      checkoutTab === 'manual' ? 'bg-[#E11D48] text-white shadow-xs font-black' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <Smartphone className="w-3.5 h-3.5" />
-                    <span>ম্যানুয়াল পেমেন্ট (TrxID)</span>
+                    <span>📱 ম্যানুয়াল পেমেন্ট (TrxID)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCheckoutTab('online')}
+                    className={`flex-1 py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      checkoutTab === 'online' ? 'bg-slate-900 text-white shadow-xs font-black' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>⚡ অনলাইন মার্চেন্ট গেটওয়ে</span>
                   </button>
                 </div>
 
-                {/* TAB A: Online Instant Gateway */}
+                {/* TAB A: Online Instant Gateway (Real status notice - NO fake bypass) */}
                 {checkoutTab === 'online' && (
                   <div className="space-y-4 animate-in fade-in">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-700">গেটওয়ে নির্বাচন করুন:</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setOnlineGateway('bkash')}
-                          className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
-                            onlineGateway === 'bkash'
-                              ? 'border-[#D12053] bg-pink-50/50 text-[#D12053] font-black'
-                              : 'border-slate-200 text-slate-600'
-                          }`}
-                        >
-                          <div className="text-xs font-black">bKash</div>
-                          <div className="text-[10px]">Instant Auto</div>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setOnlineGateway('nagad')}
-                          className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
-                            onlineGateway === 'nagad'
-                              ? 'border-[#F7931E] bg-orange-50/50 text-[#F7931E] font-black'
-                              : 'border-slate-200 text-slate-600'
-                          }`}
-                        >
-                          <div className="text-xs font-black">Nagad</div>
-                          <div className="text-[10px]">Instant Auto</div>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setOnlineGateway('card')}
-                          className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
-                            onlineGateway === 'card'
-                              ? 'border-indigo-600 bg-indigo-50/50 text-indigo-700 font-black'
-                              : 'border-slate-200 text-slate-600'
-                          }`}
-                        >
-                          <div className="text-xs font-black">Cards</div>
-                          <div className="text-[10px]">Visa / Master</div>
-                        </button>
+                    <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 space-y-2.5 text-xs text-amber-900">
+                      <div className="font-bold flex items-center gap-2 text-amber-800">
+                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>অনলাইন মার্চেন্ট অটোমেশন স্ট্যাটাস</span>
                       </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1 text-xs">
-                      <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                        <Zap className="w-3.5 h-3.5 text-amber-500" />
-                        <span>ইনস্ট্যান্ট অটোমেশন সক্রিয়</span>
-                      </div>
-                      <p className="text-slate-500 text-[11px] leading-relaxed">
-                        অনলাইন পেমেন্ট সম্পন্ন হওয়ার সাথে সাথেই সিস্টেম অটো-ভেরিফাই করে তৎক্ষণাৎ আপনার ড্যাশবোর্ড চালু করে দেবে।
+                      <p className="text-[11px] text-amber-800/90 leading-relaxed">
+                        অনলাইন অটোমেটেড গেটওয়ে (SSLCommerz / bKash Merchant API) বর্তমানে লাইভ মার্চেন্ট অ্যাকাউন্ট কনফিগারেশন মোডে রয়েছে। কোনো অর্থ পরিশোধ না করে ফেইক বা নকল ভেরিফিকেশন সম্পূর্ণভাবে বন্ধ রয়েছে।
                       </p>
+                      <div className="pt-1.5 border-t border-amber-200/60 text-[11px] text-slate-700 font-medium">
+                        👉 কোর্স অ্যাক্সেস পেতে অনুগ্রহ করে <strong>"ম্যানুয়াল পেমেন্ট (TrxID)"</strong> অপশনে গিয়ে বিকাশ বা নগদে সেন্ড মানি করে TrxID সাবমিট করুন। অ্যাডমিন প্যানেল থেকে আপনার TrxID যাচাই করে অ্যাকাউন্ট সক্রিয় করে দেওয়া হবে।
+                      </div>
                     </div>
 
                     <button
                       type="button"
-                      onClick={handleOnlineAutoPayment}
-                      disabled={isProcessing}
-                      className="w-full py-3.5 bg-[#E11D48] hover:bg-[#BE123C] text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-rose-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      onClick={() => setCheckoutTab('manual')}
+                      className="w-full py-3.5 bg-[#E11D48] hover:bg-[#BE123C] text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-rose-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      {isProcessing ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span>অনলাইন পেমেন্ট ভেরিফাই করা হচ্ছে...</span>
-                        </>
-                      ) : (
-                        <span>অনলাইনে পে করুন ও ইনস্ট্যান্ট আনলক করুন ➔</span>
-                      )}
+                      <Smartphone className="w-4 h-4" />
+                      <span>ম্যানুয়াল পেমেন্ট ট্যাবে যান (বিকাশ / নগদ) ➔</span>
                     </button>
                   </div>
                 )}

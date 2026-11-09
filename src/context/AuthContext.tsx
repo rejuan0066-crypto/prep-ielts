@@ -209,7 +209,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       streakDays: 0,
       testsCompleted: 0,
       joinedDate: new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' }),
-      diagnostic: undefined
+      diagnostic: undefined,
+      paymentStatus: 'unpaid'
     };
 
     saveToUsersDb(cleanEmail, password, newProfile);
@@ -382,7 +383,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         streakDays: 0,
         testsCompleted: 0,
         joinedDate: new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' }),
-        diagnostic: undefined
+        diagnostic: undefined,
+        paymentStatus: 'unpaid'
       };
       saveToUsersDb(cleanEmail, password, newProfile);
       saveUser(newProfile);

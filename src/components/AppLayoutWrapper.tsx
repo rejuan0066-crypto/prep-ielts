@@ -17,7 +17,7 @@ export const AppLayoutWrapper: React.FC<{ children: React.ReactNode }> = ({ chil
   const isAuthPage = pathname === '/login' || pathname === '/';
   const isPricing = pathname === '/pricing';
 
-  const isEnrolled = !user || user.role !== 'student' || user.paymentStatus === 'approved' || user.plan === 'Pro' || user.plan === 'VIP';
+  const isEnrolled = !user || user.role !== 'student' || user.paymentStatus === 'approved';
   const isPending = user?.role === 'student' && user?.paymentStatus === 'pending';
 
   // ROUTE PROTECTION FOR STUDENTS:

@@ -484,7 +484,7 @@ export default function StudentAcademyDashboard() {
     );
   }
 
-  const isEnrolled = user.role !== 'student' || user.paymentStatus === 'approved' || user.plan === 'Pro' || user.plan === 'VIP';
+  const isEnrolled = user.role !== 'student' || user.paymentStatus === 'approved';
   const isPendingVerification = user.role === 'student' && user.paymentStatus === 'pending';
 
   // GATE A: Manual payment submitted, awaiting Admin verification

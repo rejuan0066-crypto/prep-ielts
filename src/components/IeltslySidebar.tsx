@@ -43,7 +43,7 @@ export const IeltslySidebar: React.FC = () => {
   const [mockTestsOpen, setMockTestsOpen] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  const isEnrolled = !user || user.role !== 'student' || user.paymentStatus === 'approved' || user.plan === 'Pro' || user.plan === 'VIP';
+  const isEnrolled = !user || user.role !== 'student' || user.paymentStatus === 'approved';
 
   // NEVER render course sidebar to unverified or unpaid students!
   if (!isEnrolled && user?.role === 'student') {
