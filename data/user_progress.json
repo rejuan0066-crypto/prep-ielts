@@ -1,0 +1,23 @@
+{
+  "usr_student_101": {
+    "userId": "usr_student_101",
+    "userEmail": "student@prep-ielts.com",
+    "vocabulary": {
+      "lastReadWord": "mitigate",
+      "index": 4,
+      "category": "Environment",
+      "timestamp": 1793910987118,
+      "updatedAt": "2026-11-05T20:36:27.118Z"
+    }
+  },
+  "admin_root": {
+    "userId": "admin_root",
+    "userEmail": "admin@prep-ielts.com",
+    "foundation": {
+      "lastLessonId": "l1-parts-of-speech",
+      "lastLessonTitle": "Parts of Speech & Core Sentence Structure",
+      "timestamp": 1793911046991,
+      "updatedAt": "2026-11-05T20:37:26.991Z"
+    }
+  }
+}
