@@ -47,6 +47,14 @@ export default function LoginPage() {
     setTimeout(() => {
       loginWithGoogle();
       setLoading(false);
+      try {
+        const saved = localStorage.getItem('prep_ielts_user');
+        const parsed = saved ? JSON.parse(saved) : null;
+        if (!parsed?.diagnostic?.completed) {
+          router.push('/diagnostic');
+          return;
+        }
+      } catch (e) {}
       router.push('/dashboard');
     }, 700);
   };
@@ -64,6 +72,14 @@ export default function LoginPage() {
         if (email.toLowerCase() === ADMIN_CREDENTIALS.email.toLowerCase()) {
           router.push('/admin');
         } else {
+          try {
+            const saved = localStorage.getItem('prep_ielts_user');
+            const parsed = saved ? JSON.parse(saved) : null;
+            if (!parsed?.diagnostic?.completed) {
+              router.push('/diagnostic');
+              return;
+            }
+          } catch (e) {}
           router.push('/dashboard');
         }
       } else {
@@ -87,6 +103,14 @@ export default function LoginPage() {
 
   const handleContinueAsGuest = () => {
     loginWithCredentials(STUDENT_CREDENTIALS.email, STUDENT_CREDENTIALS.password);
+    try {
+      const saved = localStorage.getItem('prep_ielts_user');
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (!parsed?.diagnostic?.completed) {
+        router.push('/diagnostic');
+        return;
+      }
+    } catch (e) {}
     router.push('/dashboard');
   };
 

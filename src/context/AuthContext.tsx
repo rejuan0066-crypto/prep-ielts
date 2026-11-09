@@ -4,6 +4,26 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export type UserRole = 'student' | 'admin' | 'moderator' | 'evaluator';
 
+export interface DiagnosticResult {
+  completed: boolean;
+  testDate: string;
+  assessedBand: number;
+  targetBand: number;
+  examTimeline: string;
+  weakestModule: string;
+  dailyHours: string;
+  readingAccuracy: number;
+  writingWordCount: number;
+  cefrLevel: 'A2' | 'B1' | 'B2' | 'C1';
+  readingScore: number;
+  writingScore: number;
+  feedback: {
+    reading: string;
+    writing: string;
+    speaking: string;
+  };
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -18,6 +38,7 @@ export interface UserProfile {
   streakDays: number;
   testsCompleted: number;
   joinedDate: string;
+  diagnostic?: DiagnosticResult;
 }
 
 interface AuthContextType {
@@ -29,6 +50,7 @@ interface AuthContextType {
   loginWithCredentials: (email: string, password: string) => { success: boolean; message?: string };
   logout: () => void;
   updateUser: (data: Partial<UserProfile>) => void;
+  saveDiagnostic: (result: DiagnosticResult) => void;
   switchRole: (role: UserRole) => void;
   upgradePlan: (plan: 'Free' | 'Pro' | 'VIP') => void;
 }
@@ -95,6 +117,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithGoogle = () => {
+    let savedDiag: DiagnosticResult | undefined;
+    try {
+      const stored = localStorage.getItem('prep_ielts_diagnostic_google');
+      if (stored) savedDiag = JSON.parse(stored);
+    } catch (e) {}
+
     const googleUser: UserProfile = {
       id: 'usr_' + Date.now().toString().slice(-4),
       name: 'রেজওয়ান আহমেদ (Google)',
@@ -102,13 +130,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
       role: 'student',
       plan: 'Pro',
-      targetBand: 7.5,
-      currentBand: 5.0,
+      targetBand: savedDiag ? savedDiag.targetBand : 7.5,
+      currentBand: savedDiag ? savedDiag.assessedBand : 0,
       studyReminderTime: '21:00',
       emailReminderEnabled: true,
-      streakDays: 1,
-      testsCompleted: 3,
-      joinedDate: 'আজকে'
+      streakDays: savedDiag ? 1 : 0,
+      testsCompleted: savedDiag ? 1 : 0,
+      joinedDate: 'আজকে',
+      diagnostic: savedDiag
     };
     saveUser(googleUser);
     setPreviewAsStudent(false);
@@ -170,20 +199,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 3. Student Demo
     if (email.trim().toLowerCase() === STUDENT_CREDENTIALS.email.toLowerCase()) {
       if (password === STUDENT_CREDENTIALS.password) {
+        let savedDiag: DiagnosticResult | undefined;
+        try {
+          const stored = localStorage.getItem('prep_ielts_diagnostic_usr_demo');
+          if (stored) savedDiag = JSON.parse(stored);
+        } catch (e) {}
+
         const studentUser: UserProfile = {
           id: 'usr_demo',
-          name: 'ডেমো শিক্ষার্থী',
+          name: 'রেজওয়ান শিক্ষার্থী',
           email: STUDENT_CREDENTIALS.email,
           avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
           role: 'student',
           plan: 'Pro',
-          targetBand: 7.5,
-          currentBand: 5.5,
+          targetBand: savedDiag ? savedDiag.targetBand : 7.5,
+          currentBand: savedDiag ? savedDiag.assessedBand : 0,
           studyReminderTime: '20:30',
           emailReminderEnabled: true,
-          streakDays: 6,
-          testsCompleted: 10,
-          joinedDate: '০১ নভে ২০২৬'
+          streakDays: savedDiag ? 1 : 0,
+          testsCompleted: savedDiag ? 1 : 0,
+          joinedDate: 'আজকে',
+          diagnostic: savedDiag
         };
         saveUser(studentUser);
         setPreviewAsStudent(false);
@@ -195,20 +231,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 4. Fallback student signup
     if (email.includes('@') && password.length >= 6) {
+      const studentId = 'usr_' + Date.now().toString().slice(-4);
+      let savedDiag: DiagnosticResult | undefined;
+      try {
+        const stored = localStorage.getItem('prep_ielts_diagnostic_' + email.trim().toLowerCase());
+        if (stored) savedDiag = JSON.parse(stored);
+      } catch (e) {}
+
       const newUser: UserProfile = {
-        id: 'usr_' + Date.now().toString().slice(-4),
+        id: studentId,
         name: email.split('@')[0],
         email: email,
         avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
         role: 'student',
         plan: 'Free',
-        targetBand: 7.0,
-        currentBand: 5.0,
+        targetBand: savedDiag ? savedDiag.targetBand : 7.0,
+        currentBand: savedDiag ? savedDiag.assessedBand : 0,
         studyReminderTime: '21:00',
         emailReminderEnabled: true,
-        streakDays: 1,
-        testsCompleted: 0,
-        joinedDate: 'আজকে'
+        streakDays: savedDiag ? 1 : 0,
+        testsCompleted: savedDiag ? 1 : 0,
+        joinedDate: 'আজকে',
+        diagnostic: savedDiag
       };
       saveUser(newUser);
       setPreviewAsStudent(false);
@@ -226,6 +270,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateUser = (data: Partial<UserProfile>) => {
     if (!user) return;
     const updated = { ...user, ...data };
+    saveUser(updated);
+  };
+
+  const saveDiagnostic = (result: DiagnosticResult) => {
+    if (!user) return;
+    const updated: UserProfile = {
+      ...user,
+      currentBand: result.assessedBand,
+      targetBand: result.targetBand,
+      testsCompleted: (user.testsCompleted || 0) + 1,
+      diagnostic: result
+    };
+    try {
+      if (user.id) localStorage.setItem('prep_ielts_diagnostic_' + user.id, JSON.stringify(result));
+      if (user.email) localStorage.setItem('prep_ielts_diagnostic_' + user.email.toLowerCase(), JSON.stringify(result));
+    } catch (e) {}
     saveUser(updated);
   };
 
@@ -249,6 +309,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       loginWithCredentials, 
       logout, 
       updateUser, 
+      saveDiagnostic,
       switchRole, 
       upgradePlan 
     }}>

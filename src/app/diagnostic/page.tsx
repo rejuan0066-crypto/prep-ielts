@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth, DiagnosticResult } from '@/context/AuthContext';
 import { 
   Sparkles, 
   ArrowRight, 
@@ -13,7 +15,9 @@ import {
   Volume2,
   Calendar,
   Zap,
-  RotateCw
+  RotateCw,
+  FileCheck,
+  AlertCircle
 } from 'lucide-react';
 
 interface QuestionSet {
@@ -65,9 +69,12 @@ const QUESTION_POOL: QuestionSet[] = [
 ];
 
 export default function DiagnosticPage() {
+  const { user, saveDiagnostic } = useAuth();
+  const router = useRouter();
+
   const [step, setStep] = useState<number>(1);
   const [targetBand, setTargetBand] = useState('7.5');
-  const [examTimeline, setExamTimeline] = useState('2 মাস পর');
+  const [examTimeline, setExamTimeline] = useState('২ মাস পর');
   
   // Dynamic question selection index
   const [currentSetIndex, setCurrentSetIndex] = useState(0);
@@ -77,6 +84,7 @@ export default function DiagnosticPage() {
   const [writingSample, setWritingSample] = useState('');
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [reportReady, setReportReady] = useState(false);
+  const [assessedResult, setAssessedResult] = useState<DiagnosticResult | null>(null);
 
   const rotateRandomQuestion = () => {
     const nextIdx = (currentSetIndex + 1) % QUESTION_POOL.length;
@@ -86,10 +94,88 @@ export default function DiagnosticPage() {
 
   const handleFinishDiagnostic = () => {
     setIsGeneratingPlan(true);
+
     setTimeout(() => {
+      // 1. Real Reading Evaluation
+      const isReadingCorrect = readingAns.trim() === currentSet.correct.trim();
+      const readingScore = isReadingCorrect ? 6.5 : (readingAns ? 4.5 : 4.0);
+
+      // 2. Real Writing Evaluation
+      const cleanWriting = writingSample.trim();
+      const words = cleanWriting.length > 0 ? cleanWriting.split(/\s+/).length : 0;
+      
+      const academicConnectors = [
+        'however', 'although', 'furthermore', 'moreover', 'therefore', 
+        'consequently', 'because', 'while', 'whereas', 'in addition', 
+        'for example', 'for instance', 'significantly', 'in contrast', 'nevertheless'
+      ];
+      const lowerWriting = cleanWriting.toLowerCase();
+      let connectorMatches = 0;
+      academicConnectors.forEach(c => {
+        if (lowerWriting.includes(c)) connectorMatches++;
+      });
+
+      let writingScore = 4.5;
+      if (words >= 50 && connectorMatches >= 2) {
+        writingScore = 7.0;
+      } else if (words >= 35 && connectorMatches >= 1) {
+        writingScore = 6.5;
+      } else if (words >= 20) {
+        writingScore = 5.5;
+      } else if (words >= 10) {
+        writingScore = 5.0;
+      }
+
+      // 3. Combined Assessed Band (Nearest 0.5)
+      const rawBand = (readingScore * 0.45) + (writingScore * 0.55);
+      const assessedBand = Math.round(rawBand * 2) / 2;
+
+      // 4. CEFR Classification
+      let cefrLevel: 'A2' | 'B1' | 'B2' | 'C1' = 'B1';
+      if (assessedBand >= 7.0) cefrLevel = 'C1';
+      else if (assessedBand >= 6.0) cefrLevel = 'B2';
+      else if (assessedBand >= 5.0) cefrLevel = 'B1';
+      else cefrLevel = 'A2';
+
+      // 5. Weakest Module determination
+      let weakestModule = 'Writing & Grammar';
+      if (readingScore < writingScore) {
+        weakestModule = 'Reading Comprehension';
+      } else if (writingScore < readingScore) {
+        weakestModule = 'Writing & Complex Sentences';
+      } else {
+        weakestModule = 'Speaking & Fluency';
+      }
+
+      const calculatedResult: DiagnosticResult = {
+        completed: true,
+        testDate: new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' }),
+        assessedBand,
+        targetBand: parseFloat(targetBand) || 7.5,
+        examTimeline,
+        weakestModule,
+        dailyHours: '1.5 Hours',
+        readingAccuracy: isReadingCorrect ? 100 : 35,
+        writingWordCount: words,
+        cefrLevel,
+        readingScore,
+        writingScore,
+        feedback: {
+          reading: isReadingCorrect 
+            ? 'প্যাসেজের ইনফারেন্স ও কি-ওয়ার্ড চমৎকার লোকেট করতে পেরেছেন (Band 6.5)।' 
+            : 'প্যাসেজের ইনফারেন্স ও স্কিমিং স্পিড বৃদ্ধি করতে হবে (Band 4.5)।',
+          writing: writingScore >= 6.0 
+            ? `ভালো বাক্য গঠন ও শব্দচয়ন (${words} শব্দ, ট্রানজিশন মার্কার ব্যবহৃত)।` 
+            : `বাক্য আরও বড় ও জটিল করতে হবে। বর্তমানে সাধারণ বাক্যের প্রাধান্য রয়েছে (${words} শব্দ)।`,
+          speaking: 'স্পিকিং ফ্লুয়েন্সিতে জড়তা দূর করতে নিয়মিত এআই স্পিকিং পার্টনার ড্রিল করুন।'
+        }
+      };
+
+      setAssessedResult(calculatedResult);
+      saveDiagnostic(calculatedResult);
       setIsGeneratingPlan(false);
       setReportReady(true);
-    }, 2000);
+    }, 1800);
   };
 
   return (
@@ -292,55 +378,82 @@ export default function DiagnosticPage() {
       )}
 
       {/* Step 4: AI Diagnostic Result & Roadmap */}
-      {reportReady && (
+      {reportReady && assessedResult && (
         <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-6 animate-in zoom-in-95">
           <div className="text-center max-w-md mx-auto space-y-2">
-            <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto">
+            <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-sm">
               <Award className="w-8 h-8 text-amber-500" />
             </div>
-            <h2 className="text-2xl font-black text-slate-900">
-              আপনার এআই ডায়াগনস্টিক রিপোর্ট প্রস্তুত!
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+              আপনার বাস্তব এআই ডায়াগনস্টিক রিপোর্ট!
             </h2>
-            <p className="text-xs text-slate-500">
-              আপনার উত্তরগুলোর ওপর ভিত্তি করে এআই আপনার বর্তমান স্তর চিহ্নিত করেছে।
+            <p className="text-xs text-slate-500 font-medium">
+              আপনার রিডিং এবং রাইটিং টেস্টের উত্তরের ওপর ভিত্তি করে আন্তর্জাতিক CEFR স্কেলে যাচাই করা হয়েছে।
             </p>
           </div>
 
           {/* Scores Overview */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t">
-            <div className="p-4 bg-slate-50 rounded-2xl text-center">
-              <span className="text-[11px] font-bold text-slate-400 uppercase">বর্তমান আনুমানিক ব্যান্ড</span>
-              <div className="text-3xl font-black text-amber-600 mt-1">Band 5.5</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-slate-100">
+            <div className="p-4 bg-amber-50/60 border border-amber-200/60 rounded-2xl text-center">
+              <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">বর্তমান ব্যান্ড স্কোর</span>
+              <div className="text-3xl font-black text-amber-700 mt-1">Band {assessedResult.assessedBand}</div>
+              <span className="text-[10px] font-bold text-amber-800 bg-amber-200/50 px-2 py-0.5 rounded-full inline-block mt-1">CEFR {assessedResult.cefrLevel}</span>
             </div>
 
-            <div className="p-4 bg-indigo-50 rounded-2xl text-center border border-indigo-100">
-              <span className="text-[11px] font-bold text-indigo-600 uppercase">টার্গেট ব্যান্ড</span>
-              <div className="text-3xl font-black text-indigo-700 mt-1">Band {targetBand}</div>
+            <div className="p-4 bg-indigo-50/60 border border-indigo-200/60 rounded-2xl text-center">
+              <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider">টার্গেট ব্যান্ড</span>
+              <div className="text-3xl font-black text-indigo-700 mt-1">Band {assessedResult.targetBand}</div>
+              <span className="text-[10px] text-indigo-600 font-semibold block mt-1">{assessedResult.examTimeline}</span>
             </div>
 
-            <div className="p-4 bg-emerald-50 rounded-2xl text-center border border-emerald-100 col-span-2 sm:col-span-1">
-              <span className="text-[11px] font-bold text-emerald-600 uppercase">প্রয়োজনীয় সময়</span>
-              <div className="text-3xl font-black text-emerald-700 mt-1">৬০ দিন</div>
+            <div className="p-4 bg-blue-50/60 border border-blue-200/60 rounded-2xl text-center">
+              <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">রিডিং মূল্যায়ন</span>
+              <div className="text-2xl font-black text-blue-700 mt-1.5">Band {assessedResult.readingScore}</div>
+              <span className="text-[10px] text-blue-600 font-semibold block mt-1">{assessedResult.readingAccuracy}% একুরেসি</span>
+            </div>
+
+            <div className="p-4 bg-rose-50/60 border border-rose-200/60 rounded-2xl text-center">
+              <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider">রাইটিং মূল্যায়ন</span>
+              <div className="text-2xl font-black text-rose-700 mt-1.5">Band {assessedResult.writingScore}</div>
+              <span className="text-[10px] text-rose-600 font-semibold block mt-1">{assessedResult.writingWordCount} শব্দ লেখা হয়েছে</span>
             </div>
           </div>
 
           {/* Diagnosis & Recommendations */}
-          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
-            <div className="font-bold text-slate-800">এআই অবজারভেশন ও পরামর্শ:</div>
-            <ul className="space-y-1 text-slate-600 list-disc pl-4">
-              <li><strong>রিডিং:</strong> প্যাসেজ বোঝার ক্ষমতা ভালো, তবে দ্রুত কি-ওয়ার্ড লোকেট করার স্ক্যানিং কৌশল দরকার।</li>
-              <li><strong>রাইটিং:</strong> আইডিয়া আছে কিন্তু বাক্যগুলো সাধারণ। কমপ্লেক্স সেন্টেন্স ও প্রাতিষ্ঠানিক ভোকাবুলারি বাড়ানো আবশ্যক।</li>
-              <li><strong>স্পিকিং:</strong> কথা বলার সময় জড়তা ও থেমে থাকা দূর করতে প্রতিদিন ১০ মিনিট এআই টিউটরের সাথে কথা বলুন।</li>
-            </ul>
+          <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3 text-xs">
+            <div className="flex items-center justify-between">
+              <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                <span>আপনার জন্য প্রস্তুতকৃত অবজারভেশন ও লার্নিং ডিরেকশন:</span>
+              </div>
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800">
+                প্রধান ফোকাস: {assessedResult.weakestModule}
+              </span>
+            </div>
+
+            <div className="space-y-2 pt-1 text-slate-700 leading-relaxed">
+              <div className="flex items-start gap-2">
+                <span className="font-bold text-blue-700 shrink-0">• রিডিং:</span>
+                <span>{assessedResult.feedback.reading}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-bold text-rose-700 shrink-0">• রাইটিং:</span>
+                <span>{assessedResult.feedback.writing}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-bold text-purple-700 shrink-0">• স্পিকিং:</span>
+                <span>{assessedResult.feedback.speaking}</span>
+              </div>
+            </div>
           </div>
 
           {/* CTA to Student Dashboard */}
-          <div className="pt-4 flex justify-center">
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               href="/dashboard"
-              className="px-8 py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold rounded-2xl text-sm shadow-xl shadow-indigo-600/25 flex items-center gap-2"
+              className="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white font-bold rounded-2xl text-sm shadow-xl shadow-rose-600/25 flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5"
             >
-              <span>আমার ৬০ দিনের লার্নিং ড্যাশবোর্ডে প্রবেশ করুন</span>
+              <span>আমার রিয়েল স্কোর অনুযায়ী ড্যাশবোর্ডে প্রবেশ করুন</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

@@ -86,18 +86,31 @@ export default function StudentAcademyDashboard() {
     setTodayFormattedBn(d.toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' }));
   }, []);
 
-  // Student Personalized Setup State (Loaded from localStorage or defaults)
-  const [startingBand, setStartingBand] = useState('5.0');
+  const diag = user?.diagnostic;
+  const isDiagnosticCompleted = !!diag?.completed;
+
+  // Student Personalized Setup State (Loaded dynamically from user's real diagnostic assessment)
+  const [startingBand, setStartingBand] = useState('0.0');
   const [targetBand, setTargetBand] = useState('7.5');
-  const [weakestModule, setWeakestModule] = useState('Writing & Speaking');
-  const [examDate, setExamDate] = useState('Within 3 Months');
+  const [weakestModule, setWeakestModule] = useState('Writing & Complex Sentences');
+  const [examDate, setExamDate] = useState('২ মাস পর');
   const [dailyCommitment, setDailyCommitment] = useState('1.5 Hours');
   const [isSetupModalOpen, setIsSetupModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (user?.diagnostic?.completed) {
+      setStartingBand(user.diagnostic.assessedBand.toFixed(1));
+      setTargetBand(user.diagnostic.targetBand.toFixed(1));
+      setWeakestModule(user.diagnostic.weakestModule || 'Writing & Complex Sentences');
+      setExamDate(user.diagnostic.examTimeline || '২ মাস পর');
+      setDailyCommitment(user.diagnostic.dailyHours || '1.5 Hours');
+    }
+  }, [user]);
 
   // Active View: 'stages' (Institute 5-Step Path) | 'today' (Daily Routine) | 'calendar' (Monthly Grid)
   const [activeTab, setActiveTab] = useState<'stages' | 'today' | 'calendar'>('stages');
 
-  // Dynamic 5-Stage Institutional Curriculum
+  // Dynamic 5-Stage Institutional Curriculum (Zero fake completed lessons)
   const [stages, setStages] = useState<InstituteStage[]>([
     {
       stageNumber: 1,
@@ -115,7 +128,7 @@ export default function StudentAcademyDashboard() {
           module: 'Diagnostic',
           durationMinutes: 15,
           xpReward: 100,
-          completed: true,
+          completed: false, // will update dynamically below
           locked: false,
           description: 'আপনার বর্তমান ইংরেজি ব্যাকরণ, ভোকাবুলারি ও রিডিং স্কিল যাচাই করে ব্যান্ড নির্ধারণ।',
           url: '/diagnostic'
@@ -124,13 +137,13 @@ export default function StudentAcademyDashboard() {
           id: 's1-2',
           stepNumber: 2,
           title: 'Personalized Study Plan & Target Milestone Mapping',
-          titleBn: 'টার্গেট ব্যান্ড ৮.০ অর্জনের জন্য দৈনিক পড়ার সময়সূচি নির্ধারণ',
+          titleBn: 'টার্গেট ব্যান্ড অর্জনের জন্য দৈনিক পড়ার সময়সূচি নির্ধারণ',
           module: 'Diagnostic',
           durationMinutes: 10,
           xpReward: 50,
-          completed: true,
+          completed: false,
           locked: false,
-          description: 'আপনার পরীক্ষার তারিখ এবং দৈনিক ১.৫ ঘণ্টা অনুযায়ী সময়সূচি চূড়ান্তকরণ।',
+          description: 'আপনার পরীক্ষার তারিখ এবং দৈনিক সময়সূচি চূড়ান্তকরণ।',
           url: '/dashboard'
         }
       ]
@@ -151,7 +164,7 @@ export default function StudentAcademyDashboard() {
           module: 'Vocabulary',
           durationMinutes: 20,
           xpReward: 75,
-          completed: true,
+          completed: false,
           locked: false,
           description: 'সাধারণ শব্দ বাদ দিয়ে ফরমাল একাডেমিক শব্দ, প্রতিশব্দ ও ব্যবহারের উদাহরণ।',
           url: '/vocabulary'
@@ -358,6 +371,20 @@ export default function StudentAcademyDashboard() {
     });
   };
 
+  useEffect(() => {
+    const diagnostic = user?.diagnostic;
+    if (diagnostic?.completed) {
+      setStages(prev => {
+        const copy = JSON.parse(JSON.stringify(prev));
+        if (copy[0] && copy[0].lessons[0]) {
+          copy[0].lessons[0].completed = true;
+          copy[0].lessons[0].description = `যাচাইকৃত লেভেল: CEFR ${diagnostic.cefrLevel} (Band ${diagnostic.assessedBand}) • মূল্যায়ন সম্পন্ন: ${diagnostic.testDate}`;
+        }
+        return copy;
+      });
+    }
+  }, [user?.diagnostic]);
+
   // Calculate dynamic overall course progress
   const allLessons = stages.flatMap(s => s.lessons);
   const totalLessons = allLessons.length;
@@ -372,6 +399,82 @@ export default function StudentAcademyDashboard() {
       <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center">
         <div className="w-10 h-10 border-4 border-[#E11D48] border-t-transparent rounded-full animate-spin mb-3" />
         <p className="text-slate-600 font-bold text-xs">অ্যাকাউন্টে প্রবেশ যাচাই করা হচ্ছে...</p>
+      </div>
+    );
+  }
+
+  // ZERO DEMO DATA GUARD: If student has NOT taken the international diagnostic test yet
+  if (!isDiagnosticCompleted && user.role === 'student') {
+    return (
+      <div className="max-w-4xl mx-auto py-10 px-4 sm:px-6 space-y-8 animate-in fade-in duration-300">
+        
+        {/* Placement Alert Badge */}
+        <div className="flex items-center justify-center">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-50 border border-rose-200 text-[#E11D48] text-xs font-bold tracking-wide">
+            <Sparkles className="w-4 h-4" />
+            <span>আন্তর্জাতিক স্ট্যান্ডার্ড ডায়াগনস্টিক টেস্ট বাকি রয়েছে</span>
+          </div>
+        </div>
+
+        {/* Hero Card */}
+        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl text-center space-y-5 relative overflow-hidden">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-rose-500 to-[#E11D48] text-white flex items-center justify-center mx-auto shadow-lg shadow-rose-500/25">
+            <Award className="w-10 h-10" />
+          </div>
+
+          <div className="max-w-2xl mx-auto space-y-2">
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              স্বাগতম, {user.name}! আপনার বাস্তব আইএলটিএস লেভেল যাচাই করুন
+            </h1>
+            <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">
+              আমাদের একাডেমিতে কোনো অনুমানভিত্তিক বা ডেমো ড্যাশবোর্ড দেখানো হয় না। আন্তর্জাতিক <strong>CEFR স্কেল</strong> ও <strong>Cambridge IELTS স্ট্যান্ডার্ডে</strong> ১৫ মিনিটের ডায়াগনস্টিক টেস্টটি সম্পন্ন করলেই আপনার আসল স্কোরের ওপর ভিত্তি করে স্টাডি প্ল্যান ও দৈনিক ক্লাস রুটিন সক্রিয় হবে।
+            </p>
+          </div>
+
+          {/* 3 Step Breakdown */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 max-w-3xl mx-auto text-left">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+              <div className="w-8 h-8 rounded-xl bg-rose-100 text-[#E11D48] font-bold text-xs flex items-center justify-center">
+                ০১
+              </div>
+              <h3 className="text-xs font-bold text-slate-800">টার্গেট ব্যান্ড নির্ধারণ</h3>
+              <p className="text-[11px] text-slate-500 leading-normal">কাঙ্ক্ষিত ব্যান্ড স্কোর (Band 6.5–8.0+) ও পরীক্ষার সম্ভাব্য সময় নির্বাচন।</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+              <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 font-bold text-xs flex items-center justify-center">
+                ০২
+              </div>
+              <h3 className="text-xs font-bold text-slate-800">কেমব্রিজ রিডিং ও রাইটিং</h3>
+              <p className="text-[11px] text-slate-500 leading-normal">প্রকৃত একাডেমিক প্যাসেজ ও বাক্য গঠনের বাস্তব লেভেল পরিমাপ।</p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 font-bold text-xs flex items-center justify-center">
+                ০৩
+              </div>
+              <h3 className="text-xs font-bold text-slate-800">রিয়েল ড্যাশবোর্ড অ্যাক্টিভেশন</h3>
+              <p className="text-[11px] text-slate-500 leading-normal">টেস্টে প্রাপ্ত স্কোরের ওপর নির্ভর করে পারসোনালাইজড ক্লাস পাথ চালু হবে।</p>
+            </div>
+          </div>
+
+          {/* Action CTA Button */}
+          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/diagnostic"
+              className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-[#E11D48] to-rose-600 hover:from-[#BE123C] hover:to-rose-700 text-white font-bold rounded-2xl text-sm shadow-xl shadow-rose-500/25 flex items-center justify-center gap-2 transform hover:-translate-y-0.5 transition-all"
+            >
+              <Zap className="w-4 h-4 fill-white" />
+              <span>আমার ১৫ মিনিটের লেভেল টেস্ট শুরু করুন (Start Level Assessment)</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          <div className="pt-2 text-[11px] text-slate-400 font-medium">
+            ⏱️ টেস্ট সম্পন্ন করতে মাত্র ১০–১৫ মিনিট সময় প্রয়োজন • শতভাগ ফ্রি ও এআই চালিত
+          </div>
+        </div>
+
       </div>
     );
   }
