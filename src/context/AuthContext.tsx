@@ -59,6 +59,7 @@ interface AuthContextType {
   toggleStudentPreview: () => void;
   loginWithCredentials: (email: string, password: string) => { success: boolean; message?: string };
   registerUser: (name: string, email: string, password: string) => { success: boolean; message?: string };
+  loginOrRegisterWithGoogle: (googleUser: { name: string; email: string; avatar?: string; googleId?: string }) => { success: boolean; isNewUser: boolean; message?: string };
   logout: () => void;
   updateUser: (data: Partial<UserProfile>) => void;
   saveDiagnostic: (result: DiagnosticResult) => void;
@@ -201,6 +202,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     saveUser(newProfile);
     setPreviewAsStudent(false);
     return { success: true };
+  };
+
+  const loginOrRegisterWithGoogle = (googleUser: { name: string; email: string; avatar?: string; googleId?: string }): { success: boolean; isNewUser: boolean; message?: string } => {
+    const cleanEmail = googleUser.email.trim().toLowerCase();
+    const cleanName = googleUser.name.trim() || cleanEmail.split('@')[0];
+
+    if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      return { success: false, isNewUser: false, message: 'সঠিক গুগল ইমেইল অ্যাকাউন্ট পাওয়া যায়নি।' };
+    }
+
+    // 1. Super Admin by email
+    if (cleanEmail === ADMIN_CREDENTIALS.email.toLowerCase()) {
+      const adminUser: UserProfile = {
+        id: 'admin_root',
+        name: 'সুপার অ্যাডমিন',
+        email: ADMIN_CREDENTIALS.email,
+        avatar: googleUser.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+        role: 'admin',
+        plan: 'VIP',
+        targetBand: 9.0,
+        currentBand: 9.0,
+        studyReminderTime: '18:00',
+        emailReminderEnabled: true,
+        streakDays: 30,
+        testsCompleted: 50,
+        joinedDate: 'সুপার অ্যাডমিন'
+      };
+      saveUser(adminUser);
+      setPreviewAsStudent(false);
+      return { success: true, isNewUser: false };
+    }
+
+    // 2. Lookup existing user in Database
+    const db = getUsersDb();
+    if (db[cleanEmail]) {
+      const existingProfile = db[cleanEmail].profile;
+      if (googleUser.avatar) {
+        existingProfile.avatar = googleUser.avatar;
+        db[cleanEmail].profile = existingProfile;
+        localStorage.setItem('prep_ielts_users_db', JSON.stringify(db));
+      }
+      saveUser(existingProfile);
+      setPreviewAsStudent(false);
+      return { success: true, isNewUser: false };
+    }
+
+    // 3. New Individual Student Account via Google Verification
+    // STRICTLY real isolated account - absolutely NO fake scores or demo data
+    const newProfile: UserProfile = {
+      id: 'usr_g_' + Date.now().toString().slice(-6),
+      name: cleanName,
+      email: cleanEmail,
+      avatar: googleUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=E11D48&color=fff`,
+      role: 'student',
+      plan: 'Free',
+      targetBand: 7.5,
+      currentBand: 0,
+      studyReminderTime: '21:00',
+      emailReminderEnabled: true,
+      streakDays: 0,
+      testsCompleted: 0,
+      joinedDate: new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' }),
+      diagnostic: undefined,
+      paymentStatus: 'unpaid'
+    };
+
+    saveToUsersDb(cleanEmail, 'google_verified_oauth_' + Date.now(), newProfile);
+    saveUser(newProfile);
+    setPreviewAsStudent(false);
+    return { success: true, isNewUser: true };
   };
 
   const loginWithCredentials = (email: string, password: string): { success: boolean; message?: string } => {
@@ -355,9 +426,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toggleStudentPreview,
       loginWithCredentials, 
       registerUser,
+      loginOrRegisterWithGoogle,
       logout, 
       updateUser, 
-      saveDiagnostic,
+      saveDiagnostic, 
       refreshUser,
       switchRole, 
       upgradePlan 
