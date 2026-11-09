@@ -7,13 +7,14 @@ import { IeltslySidebar } from './IeltslySidebar';
 export const AppLayoutWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
 
-  // Full-Screen Exam Modes: Official CD-IELTS Reading & Listening Exam, Diagnostic Test, and Admin Portal
+  // Full-Screen Exam Modes, Login Page, Diagnostic Test, and Admin Portal
   const isFullExamMode = pathname.startsWith('/practice/reading') || pathname.startsWith('/practice/listening');
   const isDiagnostic = pathname === '/diagnostic';
   const isAdminPortal = pathname.startsWith('/admin');
+  const isAuthPage = pathname === '/login' || pathname === '/';
 
-  // If on CD-IELTS reading exam, admin portal, or diagnostic test, render 100% full screen
-  if (isFullExamMode || isDiagnostic || isAdminPortal) {
+  // If on login page, CD-IELTS reading exam, admin portal, or diagnostic test, render 100% full screen
+  if (isFullExamMode || isDiagnostic || isAdminPortal || isAuthPage) {
     return (
       <div className="min-h-screen w-screen flex flex-col bg-[#F8FAFC] overflow-x-hidden">
         <div className="flex-1 w-full">{children}</div>

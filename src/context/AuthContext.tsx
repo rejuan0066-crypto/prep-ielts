@@ -22,6 +22,7 @@ export interface UserProfile {
 
 interface AuthContextType {
   user: UserProfile | null;
+  authLoaded: boolean;
   previewAsStudent: boolean;
   toggleStudentPreview: () => void;
   loginWithGoogle: () => void;
@@ -66,16 +67,18 @@ const defaultAdmin: UserProfile = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(defaultAdmin);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [authLoaded, setAuthLoaded] = useState<boolean>(false);
   const [previewAsStudent, setPreviewAsStudent] = useState<boolean>(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem('prep_ielts_user');
-    if (saved) {
-      try {
+    try {
+      const saved = localStorage.getItem('prep_ielts_user');
+      if (saved) {
         setUser(JSON.parse(saved));
-      } catch (e) {}
-    }
+      }
+    } catch (e) {}
+    setAuthLoaded(true);
   }, []);
 
   const saveUser = (u: UserProfile | null) => {
@@ -239,6 +242,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <AuthContext.Provider value={{ 
       user, 
+      authLoaded,
       previewAsStudent,
       toggleStudentPreview,
       loginWithGoogle, 

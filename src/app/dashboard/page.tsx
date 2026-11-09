@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { 
   Target, 
@@ -64,7 +65,14 @@ interface InstituteStage {
 }
 
 export default function StudentAcademyDashboard() {
-  const { user } = useAuth();
+  const { user, authLoaded } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (authLoaded && !user) {
+      router.replace('/login');
+    }
+  }, [authLoaded, user, router]);
 
   // Client-safe Date calculation
   const [currentMonthYear, setCurrentMonthYear] = useState('Nov 2026');
@@ -358,6 +366,15 @@ export default function StudentAcademyDashboard() {
 
   // Find next active lesson for the student
   const nextLesson = allLessons.find(l => !l.completed) || allLessons[allLessons.length - 1];
+
+  if (!authLoaded || !user) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-10 h-10 border-4 border-[#E11D48] border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-slate-600 font-bold text-xs">অ্যাকাউন্টে প্রবেশ যাচাই করা হচ্ছে...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-7">

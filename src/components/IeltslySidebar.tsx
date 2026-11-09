@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { 
   LayoutDashboard, 
@@ -31,12 +31,14 @@ import {
   Sparkles,
   Award,
   Globe,
-  GraduationCap
+  GraduationCap,
+  LogOut
 } from 'lucide-react';
 
 export const IeltslySidebar: React.FC = () => {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [mockTestsOpen, setMockTestsOpen] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -232,30 +234,47 @@ export const IeltslySidebar: React.FC = () => {
           </div>
         )}
 
-        {/* User Profile Card with XP Flash Points */}
+        {/* User Profile Card with XP Flash Points & Logout */}
         <div className={`p-2 rounded-2xl bg-[#F8FAFC] border border-slate-100 flex items-center justify-between gap-2 ${
           isCollapsed ? 'justify-center p-2' : ''
         }`}>
           <div className="flex items-center gap-2.5 truncate">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-800 to-indigo-900 text-white flex items-center justify-center font-bold text-xs shrink-0 ring-1 ring-slate-200">
-              {user?.name ? user.name.slice(0, 2).toUpperCase() : 'SA'}
+              {user?.name ? user.name.slice(0, 2).toUpperCase() : 'G'}
             </div>
             {!isCollapsed && (
               <div className="truncate">
                 <div className="text-xs font-bold text-slate-900 truncate">
-                  {user?.name || 'SA Swopnil'}
+                  {user?.name || 'অতিথি (Guest)'}
                 </div>
                 <div className="text-[10px] text-slate-400 truncate">
-                  {user?.plan ? `${user.plan} Pro member...` : 'PrepIELTS Pro member...'}
+                  {user?.role ? `${user.role.toUpperCase()} • ${user.plan || 'Free'}` : 'লগইন করা নেই'}
                 </div>
               </div>
             )}
           </div>
 
           {!isCollapsed && (
-            <div className="flex items-center gap-1 bg-[#FEF3C7] border border-amber-200/80 px-2.5 py-1 rounded-full text-amber-800 text-[11px] font-black shrink-0">
-              <Zap className="w-3 h-3 fill-amber-500 text-amber-500" />
-              <span>7,420</span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {user ? (
+                <button
+                  onClick={() => {
+                    logout();
+                    router.push('/login');
+                  }}
+                  title="লগআউট করুন"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              ) : (
+                <Link
+                  href="/login"
+                  className="text-[11px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 px-2 py-1 rounded-lg"
+                >
+                  লগইন
+                </Link>
+              )}
             </div>
           )}
         </div>
