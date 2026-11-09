@@ -435,7 +435,7 @@ export default function AdminPage() {
               }`}
             >
               <DollarSign className="w-4 h-4 text-emerald-400" />
-              <span>পেমেন্ট গেটওয়ে সেটআপ</span>
+              <span>পেমেন্ট ও ডিসকাউন্ট কুপন</span>
             </button>
 
             <button

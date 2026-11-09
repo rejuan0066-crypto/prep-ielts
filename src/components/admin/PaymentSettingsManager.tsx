@@ -19,8 +19,24 @@ import {
   DollarSign,
   QrCode,
   Building,
-  RefreshCw
+  RefreshCw,
+  Tag,
+  Percent,
+  Flame,
+  UserCheck
 } from 'lucide-react';
+import {
+  getCoupons,
+  saveCoupons,
+  Coupon,
+  getGlobalDiscount,
+  saveGlobalDiscount,
+  GlobalDiscount,
+  approvePaymentTransaction,
+  rejectPaymentTransaction,
+  getTransactions,
+  saveTransactions
+} from '@/lib/paymentAndCouponStore';
 
 interface GatewayConfig {
   provider: 'bkash' | 'nagad' | 'sslcommerz' | 'stripe';
@@ -169,7 +185,7 @@ const INITIAL_TRANSACTIONS: PaymentTransaction[] = [
 ];
 
 export const PaymentSettingsManager: React.FC = () => {
-  const [activeSubTab, setActiveSubTab] = useState<'gateways' | 'manual' | 'transactions'>('gateways');
+  const [activeSubTab, setActiveSubTab] = useState<'transactions' | 'coupons' | 'gateways' | 'manual'>('transactions');
   
   // Gateways state
   const [gateways, setGateways] = useState<Record<string, GatewayConfig>>(DEFAULT_GATEWAYS);
@@ -187,10 +203,25 @@ export const PaymentSettingsManager: React.FC = () => {
   const [newInstructions, setNewInstructions] = useState('');
 
   // Transactions state
-  const [transactions, setTransactions] = useState<PaymentTransaction[]>(INITIAL_TRANSACTIONS);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [trxFilter, setTrxFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
 
-  // Load from localStorage if present
+  // Coupons & Global Discount state
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [globalDiscount, setGlobalDiscount] = useState<GlobalDiscount>({ isEnabled: false, title: '', percentage: 0 });
+  const [isAddCouponOpen, setIsAddCouponOpen] = useState(false);
+  const [newCouponCode, setNewCouponCode] = useState('');
+  const [newCouponType, setNewCouponType] = useState<'percentage' | 'fixed'>('percentage');
+  const [newCouponValue, setNewCouponValue] = useState<number>(20);
+  const [newTargetStudent, setNewTargetStudent] = useState('');
+  const [newCouponDesc, setNewCouponDesc] = useState('');
+
+  // Load from store / localStorage
   useEffect(() => {
+    setTransactions(getTransactions());
+    setCoupons(getCoupons());
+    setGlobalDiscount(getGlobalDiscount());
+
     const savedGateways = localStorage.getItem('prep_ielts_gateways');
     if (savedGateways) {
       try { setGateways(JSON.parse(savedGateways)); } catch (e) {}
@@ -198,10 +229,6 @@ export const PaymentSettingsManager: React.FC = () => {
     const savedManual = localStorage.getItem('prep_ielts_manual_methods');
     if (savedManual) {
       try { setManualMethods(JSON.parse(savedManual)); } catch (e) {}
-    }
-    const savedTrx = localStorage.getItem('prep_ielts_transactions');
-    if (savedTrx) {
-      try { setTransactions(JSON.parse(savedTrx)); } catch (e) {}
     }
   }, []);
 
@@ -265,18 +292,65 @@ export const PaymentSettingsManager: React.FC = () => {
 
   // Transaction verification handlers
   const handleApproveTransaction = (trxId: string) => {
-    const updated = transactions.map(t => t.id === trxId ? { ...t, status: ('approved' as const) } : t);
-    setTransactions(updated);
-    localStorage.setItem('prep_ielts_transactions', JSON.stringify(updated));
-    setSaveSuccessMsg('পেমেন্ট সফলভাবে অনুমোদিত হয়েছে ও ছাত্রের প্যাকেজ সচল হয়েছে! ✅');
-    setTimeout(() => setSaveSuccessMsg(null), 3000);
+    approvePaymentTransaction(trxId, 'Super Admin');
+    setTransactions(getTransactions());
+    setSaveSuccessMsg('পেমেন্ট সফলভাবে অনুমোদিত হয়েছে ও ছাত্রের ড্যাশবোর্ড সচল হয়েছে! ✅');
+    setTimeout(() => setSaveSuccessMsg(null), 3500);
   };
 
   const handleRejectTransaction = (trxId: string) => {
-    const updated = transactions.map(t => t.id === trxId ? { ...t, status: ('rejected' as const) } : t);
-    setTransactions(updated);
-    localStorage.setItem('prep_ielts_transactions', JSON.stringify(updated));
+    rejectPaymentTransaction(trxId);
+    setTransactions(getTransactions());
     setSaveSuccessMsg('পেমেন্ট বাতিল করা হয়েছে। ❌');
+    setTimeout(() => setSaveSuccessMsg(null), 3500);
+  };
+
+  // Coupon Handlers
+  const handleToggleCoupon = (id: string) => {
+    const updated = coupons.map(c => c.id === id ? { ...c, isActive: !c.isActive } : c);
+    setCoupons(updated);
+    saveCoupons(updated);
+  };
+
+  const handleDeleteCoupon = (id: string) => {
+    if (confirm('কুপনটি মুছে ফেলতে চান?')) {
+      const updated = coupons.filter(c => c.id !== id);
+      setCoupons(updated);
+      saveCoupons(updated);
+      setSaveSuccessMsg('কুপন মুছে ফেলা হয়েছে!');
+      setTimeout(() => setSaveSuccessMsg(null), 2500);
+    }
+  };
+
+  const handleAddCouponSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCouponCode.trim() || newCouponValue <= 0) return;
+
+    const newCoupon: Coupon = {
+      id: 'cpn_' + Date.now(),
+      code: newCouponCode.trim().toUpperCase(),
+      discountType: newCouponType,
+      discountValue: Number(newCouponValue),
+      targetStudentEmail: newTargetStudent.trim().toLowerCase() || undefined,
+      description: newCouponDesc.trim() || (newCouponType === 'percentage' ? `${newCouponValue}% ডিসকাউন্ট` : `৳${newCouponValue} ছাড়`),
+      isActive: true,
+      createdAt: new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' })
+    };
+
+    const updated = [newCoupon, ...coupons];
+    setCoupons(updated);
+    saveCoupons(updated);
+    setIsAddCouponOpen(false);
+    setNewCouponCode('');
+    setNewTargetStudent('');
+    setNewCouponDesc('');
+    setSaveSuccessMsg(`নতুন কুপন কোড '${newCoupon.code}' সফলভাবে যুক্ত হয়েছে!`);
+    setTimeout(() => setSaveSuccessMsg(null), 3000);
+  };
+
+  const handleSaveGlobalDiscount = () => {
+    saveGlobalDiscount(globalDiscount);
+    setSaveSuccessMsg('কোর্স সার্বজনীন ডিসকাউন্ট সফলভাবে আপডেট হয়েছে!');
     setTimeout(() => setSaveSuccessMsg(null), 3000);
   };
 
@@ -298,21 +372,37 @@ export const PaymentSettingsManager: React.FC = () => {
         </div>
 
         {/* Sub-tab pills */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-2xl border border-slate-800">
+        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-950 rounded-2xl border border-slate-800">
           <button
-            onClick={() => setActiveSubTab('gateways')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              activeSubTab === 'gateways'
+            onClick={() => setActiveSubTab('transactions')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all relative cursor-pointer ${
+              activeSubTab === 'transactions'
                 ? 'bg-purple-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            অটোমেটেড গেটওয়ে
+            <span>পেমেন্ট ভেরিফিকেশন</span>
+            {transactions.filter(t => t.status === 'pending').length > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black">
+                {transactions.filter(t => t.status === 'pending').length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('coupons')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeSubTab === 'coupons'
+                ? 'bg-purple-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <span>কোর্স ডিসকাউন্ট ও কুপন ({coupons.length})</span>
           </button>
 
           <button
             onClick={() => setActiveSubTab('manual')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeSubTab === 'manual'
                 ? 'bg-purple-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-white'
@@ -322,19 +412,14 @@ export const PaymentSettingsManager: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveSubTab('transactions')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all relative ${
-              activeSubTab === 'transactions'
+            onClick={() => setActiveSubTab('gateways')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeSubTab === 'gateways'
                 ? 'bg-purple-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            <span>পেমেন্ট রিকোয়েস্ট</span>
-            {transactions.filter(t => t.status === 'pending').length > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black">
-                {transactions.filter(t => t.status === 'pending').length}
-              </span>
-            )}
+            অনলাইন গেটওয়ে
           </button>
         </div>
       </div>
@@ -525,7 +610,155 @@ export const PaymentSettingsManager: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 2: MANUAL PAYMENT METHODS MANAGER (Edumate BD Style) */}
+      {/* TAB 2: COURSE DISCOUNTS & COUPON CODES */}
+      {activeSubTab === 'coupons' && (
+        <div className="space-y-6 animate-in fade-in">
+          
+          {/* Global Discount Settings Card */}
+          <div className="bg-slate-800/80 rounded-3xl border border-slate-700 p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-700">
+              <div className="flex items-center gap-2">
+                <Flame className="w-5 h-5 text-amber-400" />
+                <div>
+                  <h3 className="font-extrabold text-sm text-white">সার্বজনীন কোর্স ডিসকাউন্ট (Site-wide Flash Sale)</h3>
+                  <p className="text-xs text-slate-400">এই ছাড়টি চালু থাকলে সকল শিক্ষার্থীর কোর্স মূল্যে স্বয়ংক্রিয়ভাবে ডিসকাউন্ট প্রযোজ্য হবে।</p>
+                </div>
+              </div>
+
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={globalDiscount.isEnabled}
+                  onChange={(e) => setGlobalDiscount({ ...globalDiscount, isEnabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">অফারের শিরোনাম / ব্যানার টাইটেল:</label>
+                <input
+                  type="text"
+                  value={globalDiscount.title}
+                  onChange={(e) => setGlobalDiscount({ ...globalDiscount, title: e.target.value })}
+                  placeholder="যেমন: প্রাক-রেজিস্ট্রেশন স্পেশাল অফার"
+                  className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-medium text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">ডিসকাউন্ট হার (%):</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={globalDiscount.percentage}
+                    onChange={(e) => setGlobalDiscount({ ...globalDiscount, percentage: Number(e.target.value) })}
+                    className="w-full px-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-mono font-bold text-white focus:outline-none focus:border-purple-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveGlobalDiscount}
+                    className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl transition-all shadow-md shrink-0 cursor-pointer"
+                  >
+                    সেভ করুন
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Coupons List & Add Modal Card */}
+          <div className="bg-slate-800/80 rounded-3xl border border-slate-700 p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-700">
+              <div>
+                <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-purple-400" />
+                  <span>কুপন কোড ম্যানেজমেন্ট ({coupons.length})</span>
+                </h3>
+                <p className="text-xs text-slate-400">নির্দিষ্ট ছাত্রকে অথবা সার্বজনীন শিক্ষার্থীদের ব্যবহারের জন্য কুপন কোড তৈরি করুন।</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAddCouponOpen(true)}
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md shrink-0 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>নতুন কুপন কোড তৈরি করুন</span>
+              </button>
+            </div>
+
+            {/* Coupons Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-900/60 text-slate-400 uppercase font-bold text-[10px] border-y border-slate-700">
+                  <tr>
+                    <th className="py-3 px-4">কুপন কোড</th>
+                    <th className="py-3 px-4">ছাড়ের পরিমাণ</th>
+                    <th className="py-3 px-4">প্রযোজ্য শিক্ষার্থী (Target)</th>
+                    <th className="py-3 px-4">বিবরণ</th>
+                    <th className="py-3 px-4">স্ট্যাটাস</th>
+                    <th className="py-3 px-4 text-right">অ্যাকশন</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/60">
+                  {coupons.map((cpn) => (
+                    <tr key={cpn.id} className="hover:bg-slate-700/30 transition-colors">
+                      <td className="py-3.5 px-4 font-mono font-black text-amber-300">
+                        {cpn.code}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold text-emerald-400 font-mono text-sm">
+                        {cpn.discountType === 'percentage' ? `${cpn.discountValue}% ছাড়` : `৳ ${cpn.discountValue.toLocaleString('bn-BD')} ক্যাশ ছাড়`}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {cpn.targetStudentEmail ? (
+                          <span className="font-mono text-purple-300 bg-purple-950/60 border border-purple-800/80 px-2 py-0.5 rounded-lg text-[11px]">
+                            {cpn.targetStudentEmail}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-medium">সকল শিক্ষার্থী (All)</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-300 text-[11px]">
+                        {cpn.description}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleCoupon(cpn.id)}
+                          className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] cursor-pointer ${
+                            cpn.isActive 
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                              : 'bg-slate-700 text-slate-400'
+                          }`}
+                        >
+                          {cpn.isActive ? 'সক্রিয়' : 'নিষ্ক্রিয়'}
+                        </button>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCoupon(cpn.id)}
+                          className="p-1.5 text-rose-400 hover:bg-rose-500/20 rounded-lg transition-colors cursor-pointer"
+                          title="মুছে ফেলুন"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: MANUAL PAYMENT METHODS MANAGER (Edumate BD Style) */}
       {activeSubTab === 'manual' && (
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -601,17 +834,32 @@ export const PaymentSettingsManager: React.FC = () => {
       {/* TAB 3: STUDENT TRANSACTIONS & APPROVAL VERIFICATION */}
       {activeSubTab === 'transactions' && (
         <div className="bg-slate-800/80 rounded-3xl border border-slate-700 shadow-sm overflow-hidden p-6 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="font-bold text-sm text-white flex items-center gap-2">
                 <Clock className="w-4 h-4 text-amber-400" />
                 <span>শিক্ষার্থীদের পেমেন্ট ট্রানজেকশন তালিকা ({transactions.length})</span>
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                বিকাশ/নগদ TrxID যাচাই করে ১-ক্লিকে অনুমোদন করুন (ছাত্রের প্যাকেজ সাথে সাথে সচল হবে)
+                বিকাশ/নগদ TrxID যাচাই করে ১-ক্লিকে অনুমোদন করুন (ছাত্রের ড্যাশবোর্ড সাথে সাথে সচল হবে)
               </p>
             </div>
-            <span className="text-xs text-purple-300 font-mono">Live Verification Queue</span>
+
+            {/* Filter Pills */}
+            <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-700 text-[11px] font-bold">
+              {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setTrxFilter(f)}
+                  className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                    trxFilter === f ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {f === 'all' ? 'সবগুলো' : f === 'pending' ? 'অপেক্ষারত' : f === 'approved' ? 'অনুমোদিত' : 'বাতিল'}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -622,14 +870,16 @@ export const PaymentSettingsManager: React.FC = () => {
                   <th className="py-3 px-4">প্যাকেজ ও মেয়াদ</th>
                   <th className="py-3 px-4">পরিমাণ (BDT)</th>
                   <th className="py-3 px-4">পেমেন্ট মাধ্যম</th>
-                  <th className="py-3 px-4">TrxID / রেফারেন্স</th>
+                  <th className="py-3 px-4">প্রেরক / TrxID</th>
                   <th className="py-3 px-4">তারিখ</th>
                   <th className="py-3 px-4">স্ট্যাটাস</th>
                   <th className="py-3 px-4 text-right">যাচাই / অনুমোদন</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/60">
-                {transactions.map((trx) => (
+                {transactions
+                  .filter(t => trxFilter === 'all' ? true : t.status === trxFilter)
+                  .map((trx) => (
                   <tr key={trx.id} className="hover:bg-slate-700/30 transition-colors">
                     
                     <td className="py-3.5 px-4">
@@ -643,7 +893,9 @@ export const PaymentSettingsManager: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4">
-                      <span className="text-sm font-black text-emerald-400 font-mono">{trx.amount}</span>
+                      <span className="text-sm font-black text-emerald-400 font-mono">
+                        {trx.amount || (trx.finalAmount ? `৳ ${trx.finalAmount.toLocaleString('bn-BD')}` : '-')}
+                      </span>
                     </td>
 
                     <td className="py-3.5 px-4">
@@ -652,8 +904,11 @@ export const PaymentSettingsManager: React.FC = () => {
                       </span>
                     </td>
 
-                    <td className="py-3.5 px-4 font-mono font-bold text-amber-300">
-                      {trx.trxId}
+                    <td className="py-3.5 px-4 font-mono font-bold">
+                      <div className="text-amber-300">{trx.trxId}</div>
+                      {trx.senderNumber && (
+                        <div className="text-[10px] text-slate-400 font-normal">নম্বর: {trx.senderNumber}</div>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-4 text-slate-400 text-[11px]">
@@ -807,6 +1062,121 @@ export const PaymentSettingsManager: React.FC = () => {
                   className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs"
                 >
                   সংরক্ষণ করুন
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* ADD COUPON MODAL */}
+      {isAddCouponOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl space-y-5 text-white animate-in zoom-in-95">
+            
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h4 className="font-extrabold text-base text-white flex items-center gap-2">
+                <Tag className="w-4 h-4 text-purple-400" />
+                <span>নতুন কোর্স কুপন তৈরি করুন</span>
+              </h4>
+              <button
+                type="button"
+                onClick={() => setIsAddCouponOpen(false)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddCouponSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                  কুপন কোড (Coupon Code):
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newCouponCode}
+                  onChange={(e) => setNewCouponCode(e.target.value.toUpperCase())}
+                  placeholder="যেমন: SPECIAL50 বা IELTS1000"
+                  className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl font-mono font-bold text-white uppercase focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                    ছাড়ের ধরন:
+                  </label>
+                  <select
+                    value={newCouponType}
+                    onChange={(e) => setNewCouponType(e.target.value as any)}
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl font-medium text-white focus:outline-none focus:border-purple-500"
+                  >
+                    <option value="percentage">শতকরা ছাড় (%)</option>
+                    <option value="fixed">নির্দিষ্ট টাকা (৳)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                    ছাড়ের মান ({newCouponType === 'percentage' ? '%' : '৳'}):
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={newCouponValue}
+                    onChange={(e) => setNewCouponValue(Number(e.target.value))}
+                    placeholder="যেমন: 20 বা 1000"
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl font-mono font-bold text-white focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                  নির্দিষ্ট ছাত্রের ইমেইল (ঐচ্ছিক):
+                </label>
+                <input
+                  type="email"
+                  value={newTargetStudent}
+                  onChange={(e) => setNewTargetStudent(e.target.value)}
+                  placeholder="খালি রাখলে সবাই ব্যবহার করতে পারবে, অথবা ছাত্রের ইমেইল দিন"
+                  className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl font-mono text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                />
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  * নির্দিষ্ট ছাত্রের ইমেইল দিলে শুধুমাত্র ওই ছাত্রের অ্যাকাউন্টে কোডটি কাজ করবে।
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 uppercase mb-1">
+                  বিবরণ (Description):
+                </label>
+                <input
+                  type="text"
+                  value={newCouponDesc}
+                  onChange={(e) => setNewCouponDesc(e.target.value)}
+                  placeholder="যেমন: বিশেষ স্কলারশিপ কুপন কোড"
+                  className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddCouponOpen(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl cursor-pointer"
+                >
+                  বাতিল
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-md cursor-pointer"
+                >
+                  কুপন সেভ করুন
                 </button>
               </div>
             </form>

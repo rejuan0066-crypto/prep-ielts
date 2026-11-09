@@ -447,13 +447,13 @@ export default function DiagnosticPage() {
             </div>
           </div>
 
-          {/* CTA to Student Dashboard */}
+          {/* CTA to Student Dashboard & Package Activation */}
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
-              href="/dashboard"
-              className="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white font-bold rounded-2xl text-sm shadow-xl shadow-rose-600/25 flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5"
+              href="/pricing"
+              className="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white font-bold rounded-2xl text-sm shadow-xl shadow-rose-600/25 flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5 cursor-pointer"
             >
-              <span>আমার রিয়েল স্কোর অনুযায়ী ড্যাশবোর্ডে প্রবেশ করুন</span>
+              <span>কোর্স প্যাকেজ নির্বাচন ও ড্যাশবোর্ড সক্রিয় করুন</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

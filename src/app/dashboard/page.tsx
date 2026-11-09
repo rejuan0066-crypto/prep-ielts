@@ -37,7 +37,11 @@ import {
   FileText,
   RotateCcw,
   Sliders,
-  Check
+  Check,
+  CreditCard,
+  RefreshCw,
+  AlertCircle,
+  ShieldCheck
 } from 'lucide-react';
 
 interface StageLesson {
@@ -65,8 +69,9 @@ interface InstituteStage {
 }
 
 export default function StudentAcademyDashboard() {
-  const { user, authLoaded } = useAuth();
+  const { user, authLoaded, refreshUser } = useAuth();
   const router = useRouter();
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
 
   useEffect(() => {
     if (authLoaded && !user) {
@@ -472,6 +477,167 @@ export default function StudentAcademyDashboard() {
 
           <div className="pt-2 text-[11px] text-slate-400 font-medium">
             ⏱️ টেস্ট সম্পন্ন করতে মাত্র ১০–১৫ মিনিট সময় প্রয়োজন • শতভাগ ফ্রি ও এআই চালিত
+          </div>
+        </div>
+
+      </div>
+    );
+  }
+
+  const isEnrolled = user.role !== 'student' || user.paymentStatus === 'approved' || user.plan === 'Pro' || user.plan === 'VIP';
+  const isPendingVerification = user.role === 'student' && user.paymentStatus === 'pending';
+
+  // GATE A: Manual payment submitted, awaiting Admin verification
+  if (isPendingVerification) {
+    return (
+      <div className="max-w-3xl mx-auto py-12 px-4 space-y-6 animate-in fade-in duration-300">
+        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl text-center space-y-6 relative overflow-hidden">
+          <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto shadow-sm">
+            <Clock className="w-8 h-8 animate-pulse text-amber-600" />
+          </div>
+
+          <div className="space-y-2 max-w-lg mx-auto">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100/80 text-amber-800 text-[11px] font-bold">
+              <Clock className="w-3.5 h-3.5" />
+              <span>পেমেন্ট ভেরিফিকেশন প্রক্রিয়াধীন (Pending Verification)</span>
+            </div>
+            <h1 className="text-2xl font-black text-slate-900">
+              আপনার পেমেন্ট তথ্য সফলভাবে জমা হয়েছে!
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              ধন্যবাদ <strong>{user.name}</strong>। অ্যাডমিন আপনার প্রেরিত TrxID ভেরিফাই করার সাথে সাথেই আপনার সম্পূর্ণ ড্যাশবোর্ড ও ৬০ দিনের স্টাডি প্ল্যান স্বয়ংক্রিয়ভাবে সক্রিয় হয়ে যাবে।
+            </p>
+          </div>
+
+          {/* Submission Details Card */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 max-w-md mx-auto text-left space-y-2.5 text-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 font-bold text-slate-800">
+              <span>পেমেন্ট রিকোয়েস্ট বিবরণী</span>
+              <span className="text-amber-600 font-black">অপেক্ষমান</span>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>প্যাকেজ:</span>
+              <strong className="text-slate-900">{user.pendingPayment?.planName || 'PrepIELTS Pro'}</strong>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>পেমেন্ট মাধ্যম:</span>
+              <strong className="text-slate-900">{user.pendingPayment?.method || 'bKash / Nagad'}</strong>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>প্রেরক নম্বর:</span>
+              <strong className="text-slate-900 font-mono">{user.pendingPayment?.senderNumber || '-'}</strong>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>TrxID:</span>
+              <strong className="text-[#E11D48] font-mono font-black">{user.pendingPayment?.trxId || '-'}</strong>
+            </div>
+            <div className="flex justify-between text-slate-600">
+              <span>জমার সময়:</span>
+              <strong className="text-slate-700">{user.pendingPayment?.submittedAt || 'আজকে'}</strong>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button
+              onClick={() => {
+                setIsCheckingPayment(true);
+                refreshUser();
+                setTimeout(() => setIsCheckingPayment(false), 800);
+              }}
+              disabled={isCheckingPayment}
+              className="px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isCheckingPayment ? 'animate-spin' : ''}`} />
+              <span>{isCheckingPayment ? 'চেক করা হচ্ছে...' : 'স্ট্যাটাস রিফ্রেশ করুন'}</span>
+            </button>
+            <Link
+              href="/support"
+              className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all"
+            >
+              <span>জরুরি হেল্পলাইন ও WhatsApp</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // GATE B: Diagnostic completed, but package NOT purchased yet
+  if (!isEnrolled) {
+    return (
+      <div className="max-w-4xl mx-auto py-10 px-4 space-y-8 animate-in fade-in duration-300">
+        
+        {/* Test Result Header Ribbon */}
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-lg">
+              ✓
+            </div>
+            <div>
+              <div className="text-xs text-emerald-100 font-medium">লেভেল টেস্ট সম্পন্ন হয়েছে</div>
+              <div className="font-bold text-sm sm:text-base">
+                যাচাইকৃত স্কোর: <strong className="text-amber-300">Band {startingBand}</strong> (CEFR {diag?.cefrLevel || 'B1'}) ➔ লক্ষ্য: <strong>Band {targetBand}</strong>
+              </div>
+            </div>
+          </div>
+          <div className="self-end sm:self-auto text-xs font-bold bg-white/20 px-3 py-1.5 rounded-xl">
+            ফোকাস: {weakestModule}
+          </div>
+        </div>
+
+        {/* Enrollment Paywall Card */}
+        <div className="bg-white rounded-3xl p-8 sm:p-10 border border-slate-200 shadow-xl text-center space-y-6 relative overflow-hidden">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-purple-500/25">
+            <CreditCard className="w-10 h-10" />
+          </div>
+
+          <div className="max-w-2xl mx-auto space-y-2">
+            <span className="text-xs font-bold text-purple-600 uppercase tracking-wider">
+              পরবর্তী ধাপ: কোর্স এনরোলমেন্ট ও প্যাকেজ অ্যাক্টিভেশন
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              আপনার পারসোনালাইজড ড্যাশবোর্ড সক্রিয় করুন
+            </h1>
+            <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">
+              আপনার টেস্ট ফলাফলের ভিত্তিতে সম্পূর্ণ ৬০ দিনের লার্নিং পাথ ও ডেইলি রুটিন তৈরি করা হয়েছে। প্ল্যাটফর্মের আনলিমিটেড এআই স্পিকিং পার্টনার, কেমব্রিজ টেস্ট লাইব্রেরি, এআই রাইটিং ইভ্যালুয়েশন ও ড্যাশবোর্ড ক্লাস আনলক করতে আপনার পছন্দমতো প্যাকেজ নির্বাচন করুন।
+            </p>
+          </div>
+
+          {/* Value Highlights */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl mx-auto text-left text-xs">
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+              <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-amber-500" />
+                <span>ইনস্ট্যান্ট অটো ভেরিফাই</span>
+              </div>
+              <p className="text-slate-500 text-[11px]">অনলাইনে বিকাশ বা নগদে পেমেন্ট করলেই সাথে সাথে ড্যাশবোর্ড আনলক।</p>
+            </div>
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+              <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>ম্যানুয়াল পেমেন্ট সুবিধা</span>
+              </div>
+              <p className="text-slate-500 text-[11px]">সেন্ড মানি করে TrxID সাবমিট করলে অ্যাডমিন দ্রুত অনুমোদন দেবে।</p>
+            </div>
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+              <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-purple-600" />
+                <span>কুপন কোড ডিসকাউন্ট</span>
+              </div>
+              <p className="text-slate-500 text-[11px]">অ্যাডমিন প্রদত্ত বিশেষ কুপন কোড ব্যবহার করে অতিরিক্ত ছাড় উপভোগ করুন।</p>
+            </div>
+          </div>
+
+          {/* CTA Button */}
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/pricing"
+              className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-[#E11D48] to-rose-600 hover:from-[#BE123C] hover:to-rose-700 text-white font-bold rounded-2xl text-sm shadow-xl shadow-rose-500/25 flex items-center justify-center gap-2 transform hover:-translate-y-0.5 transition-all cursor-pointer"
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>প্যাকেজ নির্বাচন ও কোর্স ফি পরিশোধ করুন (Enroll Now)</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
         </div>
 

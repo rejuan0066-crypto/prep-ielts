@@ -24,6 +24,15 @@ export interface DiagnosticResult {
   };
 }
 
+export interface PendingPaymentInfo {
+  trxId: string;
+  method: string;
+  senderNumber: string;
+  planName: string;
+  amount: string;
+  submittedAt: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -39,6 +48,8 @@ export interface UserProfile {
   testsCompleted: number;
   joinedDate: string;
   diagnostic?: DiagnosticResult;
+  paymentStatus?: 'unpaid' | 'pending' | 'approved';
+  pendingPayment?: PendingPaymentInfo;
 }
 
 interface AuthContextType {
@@ -51,6 +62,7 @@ interface AuthContextType {
   logout: () => void;
   updateUser: (data: Partial<UserProfile>) => void;
   saveDiagnostic: (result: DiagnosticResult) => void;
+  refreshUser: () => void;
   switchRole: (role: UserRole) => void;
   upgradePlan: (plan: 'Free' | 'Pro' | 'VIP') => void;
 }
@@ -93,14 +105,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authLoaded, setAuthLoaded] = useState<boolean>(false);
   const [previewAsStudent, setPreviewAsStudent] = useState<boolean>(false);
 
-  useEffect(() => {
+  const refreshUser = () => {
     try {
       const saved = localStorage.getItem('prep_ielts_user');
       if (saved) {
-        setUser(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        const db = getUsersDb();
+        if (parsed.email && db[parsed.email.toLowerCase()]) {
+          setUser(db[parsed.email.toLowerCase()].profile);
+          localStorage.setItem('prep_ielts_user', JSON.stringify(db[parsed.email.toLowerCase()].profile));
+          return;
+        }
+        setUser(parsed);
       }
     } catch (e) {}
+  };
+
+  useEffect(() => {
+    refreshUser();
     setAuthLoaded(true);
+
+    const handleStorageChange = () => {
+      refreshUser();
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const saveUser = (u: UserProfile | null) => {
@@ -329,6 +358,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logout, 
       updateUser, 
       saveDiagnostic,
+      refreshUser,
       switchRole, 
       upgradePlan 
     }}>
