@@ -5,15 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useAuth, ADMIN_CREDENTIALS } from '@/context/AuthContext';
 import { 
   GraduationCap, 
-  ShieldCheck, 
   Mail, 
   Lock, 
   Eye, 
   EyeOff, 
   ArrowRight, 
   User,
-  BookOpen,
-  CheckCircle2,
   AlertCircle
 } from 'lucide-react';
 
@@ -21,7 +18,6 @@ export default function LoginPage() {
   const router = useRouter();
   const { user, authLoaded, loginWithCredentials, registerUser } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'student' | 'admin'>('student');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   
   const [fullName, setFullName] = useState('');
@@ -50,7 +46,7 @@ export default function LoginPage() {
     setTimeout(() => {
       let res: { success: boolean; message?: string };
 
-      if (activeTab === 'student' && authMode === 'register') {
+      if (authMode === 'register') {
         res = registerUser(fullName, email, password);
       } else {
         res = loginWithCredentials(email, password);
@@ -100,68 +96,37 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Portal Switcher (Student vs Admin) */}
+        {/* Auth Mode Toggle: Sign In vs Create Account */}
         <div className="flex items-center gap-1.5 p-1 bg-white/10 rounded-2xl border border-white/10">
           <button
             type="button"
-            onClick={() => { setActiveTab('student'); setErrorMsg(null); }}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeTab === 'student'
+            onClick={() => { setAuthMode('login'); setErrorMsg(null); }}
+            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              authMode === 'login'
                 ? 'bg-[#E11D48] text-white shadow-xs'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>শিক্ষার্থী পোর্টাল</span>
+            <span>লগইন করুন</span>
           </button>
           <button
             type="button"
-            onClick={() => { setActiveTab('admin'); setErrorMsg(null); }}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeTab === 'admin'
-                ? 'bg-purple-600 text-white shadow-xs'
+            onClick={() => { setAuthMode('register'); setErrorMsg(null); }}
+            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              authMode === 'register'
+                ? 'bg-[#E11D48] text-white shadow-xs'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>অ্যাডমিন পোর্টাল</span>
+            <span>নতুন অ্যাকাউন্ট তৈরি</span>
           </button>
         </div>
-
-        {/* Auth Mode Toggle for Students: Sign In vs Create Account */}
-        {activeTab === 'student' && (
-          <div className="flex items-center justify-center gap-4 text-xs font-bold border-b border-white/10 pb-3">
-            <button
-              type="button"
-              onClick={() => { setAuthMode('login'); setErrorMsg(null); }}
-              className={`pb-1 transition-all cursor-pointer ${
-                authMode === 'login'
-                  ? 'text-white border-b-2 border-[#E11D48]'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              লগইন করুন
-            </button>
-            <span className="text-slate-600">•</span>
-            <button
-              type="button"
-              onClick={() => { setAuthMode('register'); setErrorMsg(null); }}
-              className={`pb-1 transition-all cursor-pointer ${
-                authMode === 'register'
-                  ? 'text-white border-b-2 border-[#E11D48]'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              নতুন অ্যাকাউন্ট তৈরি
-            </button>
-          </div>
-        )}
 
         {/* Credentials Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           
           {/* Full Name input for registration */}
-          {activeTab === 'student' && authMode === 'register' && (
+          {authMode === 'register' && (
             <div className="space-y-1.5 animate-in fade-in">
               <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
                 <User className="w-3.5 h-3.5 text-slate-400" />
@@ -187,7 +152,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder={activeTab === 'admin' ? 'admin@prep-ielts.com' : 'yourname@example.com'}
+              placeholder="yourname@example.com"
               required
               className="w-full px-3.5 py-2.5 bg-slate-900/80 border border-white/15 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#E11D48] transition-all"
             />
@@ -227,16 +192,12 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-3 text-xs sm:text-sm font-black rounded-xl text-white shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
-              activeTab === 'admin'
-                ? 'bg-purple-600 hover:bg-purple-500'
-                : 'bg-[#E11D48] hover:bg-[#BE123C]'
-            }`}
+            className="w-full py-3 text-xs sm:text-sm font-black rounded-xl text-white shadow-lg bg-[#E11D48] hover:bg-[#BE123C] transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <span>
               {loading 
                 ? 'প্রক্রিয়াধীন...' 
-                : activeTab === 'student' && authMode === 'register' 
+                : authMode === 'register' 
                   ? 'আমার নিজস্ব অ্যাকাউন্ট তৈরি করুন' 
                   : 'লগইন করুন'}
             </span>
@@ -246,7 +207,7 @@ export default function LoginPage() {
 
         {/* Footer info */}
         <div className="text-center pt-2 border-t border-white/10 text-[11px] text-slate-400">
-          {activeTab === 'student' && authMode === 'login' ? (
+          {authMode === 'login' ? (
             <span>
               অ্যাকাউন্ট নেই?{' '}
               <button
@@ -257,7 +218,7 @@ export default function LoginPage() {
                 এখানে ক্লিক করে নতুন অ্যাকাউন্ট খুলুন
               </button>
             </span>
-          ) : activeTab === 'student' ? (
+          ) : (
             <span>
               ইতিমধ্যেই অ্যাকাউন্ট আছে?{' '}
               <button
@@ -268,8 +229,6 @@ export default function LoginPage() {
                 লগইন করুন
               </button>
             </span>
-          ) : (
-            <span>অ্যাডমিনিস্ট্রেটর পোর্টাল সিকিউর এক্সেস</span>
           )}
         </div>
 
